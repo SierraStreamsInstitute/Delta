@@ -8,7 +8,7 @@ This folder contains annual MRLC land cover data for each of SSI's field and sup
 
 Note that, for the purposes of this study, we only evaluated land cover within the bounds of the Huc8 watersheds referenced in the DeltaHuc8_20260323.zip file described below. So for a few of the sites, the 5-km buffers extended beyond the extent of the NLCD rasters, and therefore, the total pixel count was lower for these buffers.
 
-For additional scripts, ource datasets, and access to the ArcGIS project file, please contact SSI (jeff@sierrastreamsinstitute.org).
+For additional scripts, source datasets, and access to the ArcGIS project file, please contact SSI (jeff@sierrastreamsinstitute.org).
 
 ## II. Huc8 Shapefile
 ### DeltaHuc8_20260322.zip
