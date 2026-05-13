@@ -4,7 +4,7 @@
 #### Updated: 13 May 2026 by Jessica Herrmann
 
 ## I. Overview
-This repo contains free, publicly-accessible environmental and biological datasets curated by SSI staff for analysis in the Delta Research Project.
+This repo contains free, open-source environmental and biological datasets curated by SSI staff for analysis in the Delta Research Project.
 
 Citations for individual datasets can be found under the individual ReadMe markdown files within each separate data folder. Private and/or unpublished data has not been included in this repository.
 
