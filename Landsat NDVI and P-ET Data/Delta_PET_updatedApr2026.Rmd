@@ -1,0 +1,126 @@
+---
+title: "Delta_PET_updatedApr2026"
+author: "Jessica Herrmann"
+date: "2026-04-10"
+output: html_document
+---
+
+This script was written to calculate P-ET (precipitation minus evapotranspiration) from NDVI values downloaded from the Landsat 8-day NDVI dataset on GEE. P-ET is one of several climate variables used in the Delta Project and can be used as a proxy for average groundwater runoff. Here, we have calculated a mean NDVI value for each site and water year, from WY 2006 - 2024. We referenced the model for (predicted) ET from Rungee et al. 2021.
+
+```{r Package libraries}
+library(curl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(dataRetrieval)
+library(tidyquant)
+library(zoo)
+library(lubridate)
+```
+
+```{r Load & clean data}
+## 8-day Landsat NDVI data, via Google Earth Engine (30-m resolution)
+## Already combined for field and supp. sites
+ndvi <- ALLDeltaSitesLandsat8DayNDVI_1KM_5KM_2005_2025
+ndvi <- ndvi[,c(2:6)] ## Note that this is a shorter dataset than the PRISM data because of the 8-day cadence.
+
+## PRISM daily data data for field sites and supplemental sites (2005 - 2024, 800-m resolution)
+## I had to go back and download ppt data for 2004 in order to calculate PP for WY 2006
+prism.field2004 <- FieldSites_PRISM_ppt_stable_800m_20040101_20041231
+prism.field2004 <- prism.field2004[,c(1,5:6)]
+
+prism.supp2004 <- SuppSites_PRISM_ppt_stable_800m_20040101_20041231
+prism.supp2004 <- prism.supp2004[,c(1,5:6)]
+  
+prism.field20052025 <- DeltaFieldSites_PRISM_2005_2024
+prism.field20052025 <- prism.field20052025[,c(2,6:7)] ## Subset to only daily precip.
+prism.field20052025$Date <- mdy(prism.field20052025$Date)
+
+prism.supp20052025 <- DeltaSupplementalSites_PRISM_2005_2024
+prism.supp20052025 <- prism.supp20052025[,c(2,6:7)]
+prism.supp20052025$Date <- mdy(prism.supp20052025$Date)
+
+prism.field <- rbind(prism.field2004, prism.field20052025)
+prism.supp <- rbind(prism.supp2004, prism.supp20052025)
+
+ppt <- rbind(prism.field, prism.supp)
+
+## Extract Month and Year
+ppt$Month <- month(ymd(ppt$Date))
+ppt$Year <- year(ymd(ppt$Date))
+
+ppt <- ppt %>%
+  mutate(WY = calcWaterYear(ppt$Date)) # USGS water year
+
+colnames(ppt)[colnames(ppt) == "Name"] <- "Site"
+ppt <- ppt[,c(1:2,4:6,3)]
+```
+
+```{r Calculate mean NDVI and PPT by water year for each site}
+## NDVI:
+WY_ndvi <- ndvi %>%
+  group_by(Site, WY) %>%
+  mutate(WYmeanNDVI_1km = mean(meanNDVI_1km, na.rm = T)) %>%
+  mutate(WYmeanNDVI_5km = mean(meanNDVI_5km, na.rm = T))
+
+WY_ndvi <- WY_ndvi[,c(1,3,6:7)]
+WY_ndvi <- WY_ndvi[!duplicated(WY_ndvi), ]
+
+## PPT:
+##Calculate PP (two-year avg. precip.)
+## First calculate total precip by site and water year
+
+## Group by site and WY, then calculate total precip
+## Then take the two-year average (PP) of total precipitation by site.
+## We want the avg. value of total precip by site for the current and antecedent WY.
+WY_ppt <- ppt %>%
+  group_by(Site, WY) %>%
+  mutate(WY_Totppt = sum(PPT))
+
+WY_ppt <- subset(WY_ppt, Month == 10) ## Subset to month of Oct. to capture one value per unique WY
+WY_ppt <- WY_ppt[,c(1,5,7)]
+WY_ppt <- WY_ppt[!duplicated(WY_ppt), ]
+
+## PP is the average of the current and preceding WY's total precip values.
+## Note that WY 2007 is the first hydro. year we can calculate P-ET for,
+## since PP is calculated from WY's 2006 and 2007 (including months from calendar years 2005 through 2006).
+
+PP_ppt <- WY_ppt %>%
+  group_by(Site) %>%
+  mutate(PP = rollmean(WY_Totppt, k = 2, fill = NA, align = "right"))
+
+## IMPORTANT - We don't have full data for WY 2005, 2006, and 2025. Climate data for calendar year 2025 isn't available through PRISM as of Apr. 2026. It will become stable in June 2026.For now, I'm excluding WY 2025 because it's incomplete due to lack of PRISM data.
+PP_ppt <- PP_ppt %>% filter(!WY %in% c("2005", "2025"))
+```
+
+```{r Calculate P-ET}
+## Combine the NDVI and precip df's:
+ndvi_ppt <- left_join(PP_ppt, WY_ndvi, by = c("Site", "WY"))
+
+#### Apply model for Evapotranspiration (ET) ####
+## ET = 824×NDVI^2.04 + 3.96×PP^0.63 (from Rungee et al. 2021)
+
+ET_df <- ndvi_ppt %>%
+  group_by(Site, WY) %>%
+  mutate(ET_1km = (824*WYmeanNDVI_1km^2.04)+(3.96*PP^0.63)) %>%
+  mutate(ET_5km = (824*WYmeanNDVI_5km^2.04)+(3.96*PP^0.63))
+
+#### Apply equation for P-ET ####
+## Defining P-ET as total precip for the WY (by site) minus evapotranspiration water loss of the same water year
+
+P_ET <- ET_df %>%
+  group_by(Site, WY) %>%
+  mutate(P_ET_1km = WY_Totppt-ET_1km) %>%
+  mutate(P_ET_5km = WY_Totppt-ET_5km)
+
+P_ET <- P_ET[,c(1:2,9:10)] ## Simplified
+
+## We do not currently (1/26/26) have all precip data from calendar year 2025, so I am leaving WY 2025 out of the final dataset for now. This will have to be calculated later.
+
+## Some P-ET values are negative. This makes sense in theory; there are some years in which
+## more water is lost through evapotranspiration than is gained through precipitation (i.e. drought years).
+```
+
+```{r Write to a CSV}
+write.csv(P_ET, "C:\\Users\\jessicaherrmann\\Downloads\\Delta_P_ET_WY2006_2024.csv")
+```
