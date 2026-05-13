@@ -31,7 +31,7 @@ Monthly modeled flow data from The Nature Conservancy’s (TNC) Natural Flows Da
 Parameter-elevation Regressions on Independent Slopes Model (PRISM) daily 800-m gridded climate data, including air temperature, precipitation, vapor pressure deficit (VPD), dew point temperature, and surface solar radiation.
 
 ### Estimated Streamflow
-SSI’s modeled stream discharge datasets, calculated using continuous data loggers deployed at some sites
+SSI’s modeled stream discharge datasets. This folder also included the MS Excel sheet and R script used for deriving estimated streamflow from measurements of channel morphology and water level data.
 
 ## Example Scripts and Datasets
 Please refer to this folder for example NMDS and SEM scripts, as well as the example biological and environmental datasets required to run them.
