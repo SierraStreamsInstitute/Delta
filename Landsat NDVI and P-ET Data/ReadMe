@@ -23,7 +23,6 @@ Delta_PET_updatedApr2026.Rmd – this Rmd script calculates P-ET for all field a
 
 Also included in this folder are additional PRISM daily precipitation datasets used to calculate two-year average precipitation. You will need this earlier data to re-run the script, and if even earlier water years are desired, you will need to download those prior years’ worth of daily 800-m PRISM precipitation data from the data explorer using the field and supplemental site locations files located in the 2005 – 2024 PRISM Climate Data folder.
 
-  
 References:
 PRISM Group, Oregon State University, https://prism.oregonstate.edu, accessed 7 Apr. 2026.
 
