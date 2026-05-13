@@ -8,7 +8,7 @@ This folder contains some of Jeff's example R scripts and datasets to be referen
 
 ## II. Example Datasets
 ### catchment_results2 - catchment_results.csv
-This csv is the "LULC" file in the script.
+This csv is the "LULC" file referenced in the SEMs.R script.
 
 ### AllVars_i_full.csv
 This is an example environmental variables dataset with some water quality and climate data. The long format of this dataset is an example of dataset formatting for NMDS ordination analysis using the vegan package in R (Oksanen et al. 2025). 
