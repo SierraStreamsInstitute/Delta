@@ -1,0 +1,97 @@
+---
+title: "TNC Flow Metadata Join"
+author: "Jessica Herrmann"
+date: "2026-01-21"
+output: html_document
+---
+
+Quick script for joining site metadata with TNC's monthly flow and FFM datasets
+
+```{r Package Libraries}
+library(curl)
+# library(dplyr) # Included in tidyverse
+library(tidyverse)
+library(tidyr)
+library(stringr)
+library(dataRetrieval)
+```
+
+```{r Load data}
+TNC.flow <- flow_8064225_344215_346373_346375_20195626_min_mean_median_max_estimated_observed_1999_2025
+names(TNC.flow)[names(TNC.flow) == "comid"] <- "COMID"
+names(TNC.flow)[names(TNC.flow) == "value"] <- "Q.cfs"
+
+TNC.ffm <- ffm_8064225_344215_346373_346375_20195626
+names(TNC.ffm)[names(TNC.ffm) == "comid"] <- "COMID"
+
+TNC.nearby <- Delta_Site_COMIDs_for_TNC_Natural_Flows_Database_Nearby_Gages
+names(TNC.nearby)[names(TNC.nearby) == "Nearby Gage COMID"] <- "COMID"
+
+TNC.nearby2 <- flow_8058675_12076092_2769334_7952754_15014823_min_mean_median_max_estimated_observed_1999_2025
+names(TNC.nearby2)[names(TNC.nearby2) == "comid"] <- "COMID"
+names(TNC.nearby2)[names(TNC.nearby2) == "value"] <- "Q.cfs"
+
+site.meta <- Delta_Site_COMIDs_for_TNC_Natural_Flows_Database_Delta_Site_COMIDs
+```
+
+```{r Join files}
+## TNC flow data
+TNC.flow <- full_join(site.meta,TNC.flow, by = "COMID")
+TNC.flow <- pivot_wider(TNC.flow, names_from = statistic, values_from = Q.cfs)
+
+
+TNC.flow$Date <- as.Date(paste(TNC.flow$year, TNC.flow$month, "01", sep = "-"), format = "%Y-%m-%d")
+TNC.flow <- TNC.flow %>% mutate(WY = calcWaterYear(TNC.flow$Date)) # USGS water year
+
+names(TNC.flow)[names(TNC.flow) == "variable"] <- "Type"
+names(TNC.flow)[names(TNC.flow) == "month"] <- "Month"
+names(TNC.flow)[names(TNC.flow) == "year"] <- "Year"
+names(TNC.flow)[names(TNC.flow) == "min"] <- "minQ.cfs"
+names(TNC.flow)[names(TNC.flow) == "median"] <- "medianQ.cfs"
+names(TNC.flow)[names(TNC.flow) == "mean"] <- "meanQ.cfs"
+names(TNC.flow)[names(TNC.flow) == "max"] <- "maxQ.cfs"
+
+TNC.flow <- TNC.flow[,c(3,6,4:5,15,9,8,16,7,10:13)]
+
+
+
+
+
+
+## TNC FFM data
+# Not sure what to do with this, as there aren't dates for most entries.
+TNC.ffm <- full_join(site.meta,TNC.ffm, by = "COMID")
+
+
+
+
+
+
+## Nearby gages dataset
+TNC.nearby <- left_join(TNC.nearby, TNC.nearby2, by = "COMID")
+TNC.nearby <- pivot_wider(TNC.nearby, names_from = statistic, values_from = Q.cfs)
+
+TNC.nearby$Date <- as.Date(paste(TNC.nearby$year, TNC.nearby$month, "01", sep = "-"), format = "%Y-%m-%d")
+TNC.nearby <- TNC.nearby %>% mutate(WY = calcWaterYear(TNC.nearby$Date)) # USGS water year
+
+names(TNC.nearby)[names(TNC.nearby) == "variable"] <- "Type"
+names(TNC.nearby)[names(TNC.nearby) == "month"] <- "Month"
+names(TNC.nearby)[names(TNC.nearby) == "year"] <- "Year"
+names(TNC.nearby)[names(TNC.nearby) == "min"] <- "minQ.cfs"
+names(TNC.nearby)[names(TNC.nearby) == "median"] <- "medianQ.cfs"
+names(TNC.nearby)[names(TNC.nearby) == "mean"] <- "meanQ.cfs"
+names(TNC.nearby)[names(TNC.nearby) == "max"] <- "maxQ.cfs"
+names(TNC.nearby)[names(TNC.nearby) == "Nearby Gage Location Notes"] <- "Notes_on_Nearby_Gage_Location"
+
+TNC.nearby <- TNC.nearby[,c(1,4,2:3,13,8,7,14,9:12,6,5)]
+TNC.nearby.ObsOnly <- subset(TNC.nearby, Type == "observed") # Subset to only observed (gaged) flow data
+```
+
+```{r Export to CSVs}
+## Export to CSV files
+write.csv(TNC.flow, "C:\\Users\\jessicaherrmann\\Desktop\\Delta_TNCFlowData_1999_2025.csv")
+
+write.csv(TNC.ffm, "C:\\Users\\jessicaherrmann\\Desktop\\Delta_TNCFFMData_1999_2025.csv")
+
+write.csv(TNC.nearby.ObsOnly, "C:\\Users\\jessicaherrmann\\Desktop\\Delta_TNCNearbyGagesFlowData_1999_2025.csv")
+```
