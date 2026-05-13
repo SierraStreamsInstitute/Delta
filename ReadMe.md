@@ -1,10 +1,15 @@
 # Read Me
 ## Delta Research Project
-#### Authors: Jeff Lauder, Helen Fitanides, Melissa Grim, Mali Valerio, & Jessica Herrmann
-#### Contact: jeff@sierrastreamsinstitute.org, helen@sierrastreamsinstitute.org
-#### Updated: 13 May 2026
+#### Authors: Jeff Lauder, Helen Fitanides, Melissa Grim, Mali Valerio, and Jessica Herrmann
+#### Contacts: jeff@sierrastreamsinstitute.org, helen@sierrastreamsinstitute.org
+#### Updated: 13 May 2026 by Jessica Herrmann
 
-## I. Project Background
+## I. Overview
+This repo contains free, publicly-accessible environmental and biological datasets curated by SSI staff for analysis in the Delta Research Project.
+
+Citations for individual datasets can be found under the individual ReadMe markdown files within each separate data folder. Private and/or unpublished data has not been included in this repository.
+
+For more information on data useage, please contact Jeff Lauder or Helen Fitanides (contacts in header).
 
 ## II. Project Dataset Folders
 ### BMI Data
@@ -27,4 +32,9 @@ Parameter-elevation Regressions on Independent Slopes Model (PRISM) daily 800-m 
 
 ### Estimated Streamflow
 SSI’s modeled stream discharge datasets, calculated using continuous data loggers deployed at some sites
+
+## Example Scripts and Datasets
+Please refer to this folder for example NMDS and SEM scripts, as well as the example biological and environmental datasets required to run them.
+
+
 
