@@ -8,8 +8,8 @@ This folder contains water quality data for SSI's Delta Project field sites, as 
 
 Data for any given year can be added at any time, e.g. we uploaded our water quality data for 2020 through 2024 in 2025, so we may consider re-downloading prior data years again in 2027 when we pull the data from 2026. Because this data comes from multiple sources, e.g. USFS, State, and monitoring groups like ours, it is worth reading through the metadata documents such as the CEDEN Water Chemistry Data Dictionary.
 
-## II. Data Dictionary
+## II. SSI Field Sites Water Quality Data
 ### 
 
-## III. CEDEN Surface Water Chemistry Data
+## III. CEDEN Surface Water Chemistry Datasets
 ### 
