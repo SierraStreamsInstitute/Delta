@@ -19,10 +19,15 @@ Solar radiation, horizontal surfaces (MJ/m^2/day)
 Solar radiation, sloped surfaces (MJ/m^2/day)
 
 ## II. Locations Files
-Please use the Delta SSI Field & Supplemental Site Locations File to pull remaining PRISM data for 2005 – 2026, as this file is pre-formatted for compatibility with the PRISM Data Explorer. There is one tab for SSI field site locations and one for the supplemental sites.
+### SSI Field Site Locations
+Please use this locations file to pull remaining PRISM data for SSI field sites for 2005 – 2026, as it is pre-formatted for compatibility with the PRISM Data Explorer.
+
+### Supplemental Site Locations
+Please use this locations file to pull remaining PRISM data for supplemental sites for 2005 – 2026.
 
 ## III. Datasets
-DeltaFieldSites_PRISM_2005_2024 and DeltaSupplementalSites_PRISM_2005_2024 are the cleaned and concatenated datasets, combined for all years under respective site types (field vs. supplemental). These final datasets should be set up and ready to go for analysis, whereas the individual datasets in the other folders are just the data in raw form, just in case the individual file metadata needs to be accessed.
+### DeltaFieldSites_PRISM_2005_2024 and DeltaSupplementalSites_PRISM_2005_2024
+Cleaned and concatenated datasets, combined for all years under respective site types (field vs. supplemental). These final datasets should be set up and ready to go for analysis.
 
 ## IV. Reference
 PRISM Group, Oregon State University, https://prism.oregonstate.edu, accessed 7 Apr. 2026.
