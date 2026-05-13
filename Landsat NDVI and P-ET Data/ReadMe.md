@@ -26,7 +26,7 @@ This folder also contains a P-ET dataset for all sites, for water years 2006 thr
 ### Delta_PET_updatedApr2026.Rmd
 – This Rmd script calculates P-ET for all field and supplemental sites, from water years 2006 through 2024. P-ET may potentially be used as a proxy for groundwater runoff (Rungee et al. 2021). Please refer to the P-ET sub-folder under the Delta Research project Papers folder for more background information on the method. I used the daily 800-m precip data and calculated the total annual precipitation for each water year, then took the two-water year average in order to calculate PP. I also used 30-m 8-day NDVI data to calculate evapotranspiration (ET). Since there are gaps in the NDVI dataset, and Rungee model calls for mean NDVI by year/water year, I calculated average NDVI by site and water year and just excluded any NA values in the average calculations.
 
-## References:
+## V. References
 PRISM Group, Oregon State University, https://prism.oregonstate.edu, accessed 7 Apr. 2026.
 
 Earth Resources Observation and Science (EROS) Center. (2020). Landsat 8-9 Operational Land Imager / Thermal Infrared Sensor Level-2, Collection 2 [dataset]. U.S. Geological Survey.
