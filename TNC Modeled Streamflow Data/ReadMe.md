@@ -1,5 +1,5 @@
 # Read Me
-#### Delta Project TNC Natural Flows Data
+#### TNC Natural Flows Data
 #### Author: Jessica Herrmann
 #### Updated: 13 May 2026
 
