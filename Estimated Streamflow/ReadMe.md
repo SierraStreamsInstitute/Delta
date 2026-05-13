@@ -20,5 +20,5 @@ Since some of our stream gages (SHADY, DC10, DC20, BR55, MON, and EFAR) were not
 ### ERA5 Modeled Baro Pressure Datasets
 – These files are the correct ones to use for performing barometric compensation on our stage datasets for the aforementioned sites. This data is modeled to the resolution of 0.25º x 0.25º grid cells, so site coordinates were approximated to the nearest 0.25º in order to obtain matching surface pressure datasets.  Please note that since sites SHADY and DC20 were close enough to one another to fit within the same grid cell, the same barometric pressure dataset is to be used for both. The files are saved as .csv zip files under SSI's project Drive data folder. They will need to be updated to include data from mid-March through mid-September, 2026, later in the fall of 2026.
 
-## Reference
+## III. Reference
 Copernicus Climate Change Service (2025): ERA5 hourly time-series data on single levels from 1940 to present. Copernicus Climate Change Service (C3S) Climate Data Store (CDS). URL: https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels-timeseries (Accessed on 17-03-2026)
