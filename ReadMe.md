@@ -1,6 +1,6 @@
 # Read Me
 ## Delta Research Project
-#### Contacts: jeff@sierrastreamsinstitute.org, helen@sierrastreamsinstitute.org
+#### Project Contacts: jeff@sierrastreamsinstitute.org, helen@sierrastreamsinstitute.org
 #### Updated: 13 May 2026 by Jessica Herrmann
 
 ## I. Overview
