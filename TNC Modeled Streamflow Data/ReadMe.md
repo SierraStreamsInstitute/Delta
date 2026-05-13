@@ -1,7 +1,7 @@
 # Read Me
 #### Delta Project TNC Natural Flows Data
 #### Author: Jessica Herrmann
-#### Updated: 1 Apr. 2026
+#### Updated: 13 May 2026
 
 ## I. Background
 This folder contains monthly modeled flow data from 2005 through early 2026, from The Nature Conservancy’s Natural Flows Database. Please refer to the SSI Field Site COMIDs document for the COMIDs (common identifiers) of each modeled reach used in this data pull. I selected only one COMID per Delta site, even if there were multiple potential COMIDs to choose from, aiming to select the modeled reach that best overlapped with the majority of our 100-m reaches. The second tab in that document, “Nearby Gages”, is a list of gaged (USGS, CDEC) reaches that are close to, but not perfectly overlapping with, our Delta sites. I’ve also included some notes on the proximity of the gaged reach to the corresponding Delta reach, as well as information on the number of downstream tributaries. Please note that “estimated” flow is modeled unimpaired flow, so it is unlikely to be 100% accurate for heavily-managed systems, though it may be a good approximation for more remote third-order streams, especially if they are close to gaged reaches with observable flows. The CEDEN & SYRCL COMIDs document is a similar list compiled by Melissa Grim for the CEDEN supplemental sites and the one SYRCL site also referenced for BMI data. Some of the sites will share the same COMID. I pulled data from as early as 2005 so as to include the full 2006 water year.
@@ -15,7 +15,7 @@ This website was used to pull modeled flow data: https://rivers.codefornature.or
 
 ## III. R Script
 ### TNC Flow Metadata Join.Rmd
-– This is a rough .Rmd doc outlining how I reformatted the original datasets from TNC to the final versions under the Datasets folder
+– This is a rough .Rmd doc outlining how I reformatted the original datasets from TNC to the final versions under the Datasets folder.
 
 ## IV. NHD COMIDs by Site
 ### SSI Field Site COMIDs
