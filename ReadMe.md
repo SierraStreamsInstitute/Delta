@@ -1,6 +1,5 @@
 # Read Me
 ## Delta Research Project
-#### Authors: Jeff Lauder, Helen Fitanides, Melissa Grim, Mali Valerio, and Jessica Herrmann
 #### Contacts: jeff@sierrastreamsinstitute.org, helen@sierrastreamsinstitute.org
 #### Updated: 13 May 2026 by Jessica Herrmann
 
