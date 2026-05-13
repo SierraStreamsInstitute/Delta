@@ -9,7 +9,7 @@
 
 ## II. MRLC Land Cover (LndCov)
 ### NLCD20042024.zip file
-– zipped folder containing the land cover (LndCov) data, merged for all project Huc8 watersheds and organized by year, from 2004 – 2024. This is the folder I referenced for the analysis in Arc, and this .zip file is also redundantly located under the ArcGIS Project folder for added convenience.
+– A zipped folder containing the land cover (LndCov) data, merged for all project Huc8 watersheds and organized by year, from 2004 – 2024. This is the folder I referenced for the analysis in Arc, and this .zip file is also redundantly located under the ArcGIS Project folder for added convenience.
 
 To download additional data, you will need to upload the Huc8 shapefile to the data explorer (“upload shapefile”), and select your datasets and timeline of interest. EPSG3857 is the default CRS for MRLC, but Arc re-projects the TIFF files into WGS84 to match the other input data.
 
