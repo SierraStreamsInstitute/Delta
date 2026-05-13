@@ -24,5 +24,5 @@ Please use the Delta SSI Field & Supplemental Site Locations File to pull remain
 ## III. Datasets
 DeltaFieldSites_PRISM_2005_2024 and DeltaSupplementalSites_PRISM_2005_2024 are the cleaned and concatenated datasets, combined for all years under respective site types (field vs. supplemental). These final datasets should be set up and ready to go for analysis, whereas the individual datasets in the other folders are just the data in raw form, just in case the individual file metadata needs to be accessed.
 
-## Reference
+## IV. Reference
 PRISM Group, Oregon State University, https://prism.oregonstate.edu, accessed 7 Apr. 2026.
