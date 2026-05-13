@@ -3,7 +3,7 @@
 #### Author: Jessica Herrmann
 #### Updated: 13 May 2026
 
-## I. Exccel Workbook and R Script
+## I. Excel Workbook and R Script
 ### Channel Geom Calculator 2.0.xlsx
 This is an MS Excel spreadsheet of the modeled channel geometry regression models for each of the fourteen gaged Delta sites.
 
