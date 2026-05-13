@@ -29,5 +29,5 @@ NLCD20042024.zip – A zipped folder containing all NLCD geoTIFFs
 
 Delta_NLCDall_1km_5km_2004_2024.csv – This file is the same as the above file, just with raw pixel counts also included as columns.
 
-## Reference
+## VI. Reference
 U.S. Geological Survey (USGS), 2024, Annual NLCD Collection 1 Science Products: U.S. Geological Survey data release, https://doi.org/10.5066/P94UXNTS
