@@ -1,0 +1,4119 @@
+---
+title: "DeerCreek_NMDS_AdditionalSiteClusters_JH04.29.2026"
+author: "Jessica Herrmann"
+date: "2026-04-29"
+output: html_document
+---
+## Background
+
+Updated NMDS script for Deer Creek BMI data analysis - revised to include biological data with rare families removed??? (under 5% per sample event), which was then relativized using the Wisconsin Double Standardization method (relativized by column, then by row/sample). We are further subsetting to sites on DC mainstem (1, 2, 4, 6, 8, 9). Other edit was that Crambidae and Pyralidae were combined under Pyraloidea.
+
+```{r Packages}
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+require(magrittr)
+library(scales)
+library(reshape2)
+library(vegan)
+library(goeveg)
+# library(vegan3d)
+```
+
+```{r Datasets}
+## Previous dataset, for comparison only:
+# old <- Rare_removed_BMI_Daily_USGS_Flow_Daily_PRISM_Climate_SOI_PET_Raw_WQ_NA_removed_2003_2022
+# old <- old[,c(2:163)]
+# names(old)
+
+## Remove NA's from WQ dataset. It usually does not work to run ordinations with NAs in the dataset.
+bio <- FINAL_DATASET_BMI_Bio_Flow_Wq_Clim_updated5_2_26
+bio <- bio[,c(2:165)]
+# head(bio)
+nrow(bio) # n = 261 (good) - if n = 265, we still have the duplicate dates error.
+names(bio)
+
+names(bio)[66] <- "Pyraloidea" # Correcting spelling error
+bio[is.na(bio)] <- 0 # Because vegan doesn't like NA's, we are replacing NA values w/ 0's
+# But NOT deleting NA rows
+
+# colSums(is.na(bio)) # Check for NA values
+```
+
+```{r Modifying master dataset for ordinations}
+## Change Month, Site, WY, Year, Date, Season, and Flow Categories to factors
+bio$Site <- as.factor(bio$Site)
+bio$Month <- as.factor(bio$Month)
+bio$WY <- as.factor(bio$WY)
+bio$Year <- as.factor(bio$Year)
+bio$Date <- as.factor(bio$Date)
+bio$Season <- as.factor(bio$Season)
+bio$Cat1 <- as.factor(as.character(bio$Cat1))
+bio$Cat3 <- as.factor(as.character(bio$Cat3))
+bio$Cat6 <- as.factor(as.character(bio$Cat6))
+bio$Cat12 <- as.factor(as.character(bio$Cat12))
+## Also make sure all families are numeric values!
+
+## Also set levels for flow categories - will make ordinations easier
+bio$Cat1 <- factor(bio$Cat1,levels=c("Dry","Average","Wet"))
+bio$Cat3 <- factor(bio$Cat3,levels=c("Dry","Average","Wet"))
+bio$Cat6 <- factor(bio$Cat6,levels=c("Dry","Average","Wet"))
+bio$Cat12 <- factor(bio$Cat12,levels=c("Dry","Average","Wet"))
+
+## Set colors for each flow category
+color.by.cat <- c("Dry" = "coral3", "Average" = "burlywood", "Wet" = "lightskyblue")
+
+## Set levels for season
+bio$Season <- factor(bio$Season,levels = c("Base", "Peak"))
+
+## Color code by season
+color.by.season <- c("Base" = "cyan3", "Peak" = "darkcyan")
+
+
+#### UPDATED WATERSHED LOCATIONS TO TEST ####
+## Levels by watershed location along mainstem
+## Remove non-mainstem sites for this analysis (Squirrel Crk. and Little Deer Crk.)
+
+# 1. Upper DC 1/2 vs. Mid DC 4/6 vs. Lower DC 8/9
+# 2. Upper DC 1/2 vs. Mid DC 4 vs. Lower DC 6/8/9
+# 3. Upper DC 1/2/4 vs. Mid DC 6 vs. Lower DC 8/9
+# 4. Upper DC 1/2/4 vs. Lower 6/8/9
+# 5. Upper DC 1/2 vs. Lower 4/6/8/9
+# 6. Upper DC 1/2/4/6 vs. Lower 8/9
+# 7. Upper DC 1/2/4 vs. Lower DC 8/9
+# 8. Upper DC 1/2 vs. Lower 6/8/9
+
+## For all groupings, I'm also using LDC 11/12/13 and SC 15/16.
+
+## Grouping 1
+# BIO1 <- bio
+# BIO1$Watershed.location <- as.factor(ifelse(bio$Site %in% c(1,2), "Upper DC",
+#                           ifelse(bio$Site %in% c(4,6), "Middle DC", 
+#                                  ifelse(bio$Site %in% c(8,9), "Lower DC",
+#                                         ifelse(bio$Site %in% c(15,16), "Squirrel Creek",
+#                                                ifelse(bio$Site %in% c(11,12,13), "Little Deer Creek",
+#                                         0))))))
+# BIO1 <- BIO1[,c(1:6,165,7:164)]
+# BIO1$Watershed.location <- factor(BIO1$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 2
+# BIO2 <- bio
+# BIO2$Watershed.location <- as.factor(ifelse(BIO2$Site %in% c(1,2), "Upper DC",
+#                           ifelse(BIO2$Site %in% c(4), "Middle DC", 
+#                                  ifelse(BIO2$Site %in% c(6,8,9), "Lower DC",
+#                                         ifelse(BIO2$Site %in% c(15,16), "Squirrel Creek",
+#                                                ifelse(BIO2$Site %in% c(11,12,13), "Little Deer Creek",
+#                                         0))))))
+# BIO2 <- BIO2[,c(1:6,165,7:164)]
+# BIO2$Watershed.location <- factor(BIO2$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 3
+# BIO3 <- bio
+# BIO3$Watershed.location <- as.factor(ifelse(BIO3$Site %in% c(1,2,4), "Upper DC",
+#                                  ifelse(BIO3$Site %in% c(6), "Middle DC", 
+#                                         ifelse(BIO3$Site %in% c(8,9), "Lower DC",
+#                                                ifelse(BIO3$Site %in% c(15,16), "Squirrel Creek",
+#                                                       ifelse(BIO3$Site %in% c(11,12,13), "Little Deer Creek",
+#                                         0))))))
+# BIO3 <- BIO3[,c(1:6,165,7:164)]
+# BIO3$Watershed.location <- factor(BIO3$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 4
+# BIO4 <- bio
+# BIO4$Watershed.location <- as.factor(ifelse(BIO4$Site %in% c(1,2,4), "Upper DC",
+#                                      ifelse(BIO4$Site %in% c(6,8,9), "Lower DC",
+#                                             ifelse(BIO4$Site %in% c(15,16), "Squirrel Creek",
+#                                                    ifelse(BIO4$Site %in% c(11,12,13), "Little Deer Creek",
+#                                       0)))))
+# BIO4 <- BIO4[,c(1:6,165,7:164)]
+# BIO4$Watershed.location <- factor(BIO4$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 5
+# BIO5 <- bio
+# BIO5$Watershed.location <- as.factor(ifelse(BIO5$Site %in% c(1,2), "Upper DC",
+#                                         ifelse(BIO5$Site %in% c(4,6,8,9), "Lower DC",
+#                                                ifelse(BIO5$Site %in% c(15,16), "Squirrel Creek",
+#                                                       ifelse(BIO5$Site %in% c(11,12,13), "Little Deer Creek",
+#                                       0)))))
+# BIO5 <- BIO5[,c(1:6,165,7:164)]
+# BIO5$Watershed.location <- factor(BIO5$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 6
+# BIO6 <- bio
+# BIO6$Watershed.location <- as.factor(ifelse(BIO6$Site %in% c(1,2,4,6), "Upper DC",
+#                                         ifelse(BIO6$Site %in% c(8,9), "Lower DC",
+#                                                ifelse(BIO6$Site %in% c(15,16), "Squirrel Creek",
+#                                                       ifelse(BIO6$Site %in% c(11,12,13), "Little Deer Creek",
+#                                       0)))))
+# BIO6 <- BIO6[,c(1:6,165,7:164)]
+# BIO6$Watershed.location <- factor(BIO6$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 7
+# BIO7 <- subset(bio, Site != "6")
+# BIO7$Watershed.location <- as.factor(ifelse(BIO7$Site %in% c(1,2,4), "Upper DC",
+#                                         ifelse(BIO7$Site %in% c(8,9), "Lower DC",
+#                                                ifelse(BIO7$Site %in% c(15,16), "Squirrel Creek",
+#                                                       ifelse(BIO7$Site %in% c(11,12,13), "Little Deer Creek",
+#                                       0)))))
+# BIO7 <- BIO7[,c(1:6,165,7:164)]
+# BIO7$Watershed.location <- factor(BIO7$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+# 
+# ## Grouping 8
+# BIO8 <- subset(bio, Site != "4")
+# BIO8$Watershed.location <- as.factor(ifelse(BIO8$Site %in% c(1,2), "Upper DC",
+#                                         ifelse(BIO8$Site %in% c(6,8,9), "Lower DC",
+#                                                ifelse(BIO8$Site %in% c(15,16), "Squirrel Creek",
+#                                                       ifelse(BIO8$Site %in% c(11,12,13), "Little Deer Creek",
+#                                       0)))))
+# BIO8 <- BIO8[,c(1:6,165,7:164)]
+# BIO8$Watershed.location <- factor(BIO8$Watershed.location, levels = c("Upper DC", "Middle DC", "Lower DC", "Squirrel Creek", "Little Deer Creek"))
+
+## Color code by watershed location (for 3 groups and 2 groups)
+# color.by.location.3cat <- c("Upper DC" = "blue", "Middle DC" = "dodgerblue", "Lower DC" = "skyblue", "Squirrel Creek" = "olivedrab", "Little Deer Creek" = "bisque3")
+# 
+# color.by.location.2cat <- c("Upper DC" = "blue", "Lower DC" = "skyblue", "Squirrel Creek" = "olivedrab", "Little Deer Creek" = "bisque3")
+```
+
+```{r GROUPING 1 - NMDS Data Prep}
+## GROUPINGS 1. Upper DC 1/2 vs. Mid DC 4/6 vs. Lower DC 8/9
+
+#### ALL ####
+
+## METADATA MATRIX
+# BIO1.META <- BIO1[,c(1:7)] # Sample meta data (identifiers)
+# 
+# ## BIOLOGICAL/BMI DATA MATRIX
+# BIO1.BMI <- BIO1[,c(8:77)] # Note - BMI numbers must be numeric
+# 
+# ## ENVIRONMENTAL DATA MATRICES
+# BIO1.ENV <- BIO1[,c(1:7, 78:165)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+# 
+# BIO1.BWC <- BIO1[,c(78:102,106:165)] # Bio, WQ, climate (aka BWC) vars only
+# 
+# BIO1.BIOVEC <- BIO1[,c(78:102)] # Biological vectors only
+# 
+# BIO1.CLIM <- BIO1[,c(148:165)] # Climate vectors only
+# 
+# BIO1.WQ <- BIO1[,c(107:147)] # WQ vectors only
+# 
+# 
+# # CATEGORICAL VARIABLES
+# BIO1.flow <- BIO1[,c(103:106)] # Flow categories
+# BIO1.season <- BIO1[,c(6)] # Season only
+# BIO1.wslocation <- BIO1[,c(7)]
+
+
+
+
+
+
+# 1. Upper DC 1/2 vs. Mid DC 4/6 vs. Lower DC 8/9
+# 2. Upper DC 1/2 vs. (Mid DC 4) vs. Lower DC 6/8/9    ## Didn't create groupings for indiv. sites 4 & 6 b/c not enough data
+# 3. Upper DC 1/2/4 vs. (Mid DC 6) vs. Lower DC 8/9.   ## Didn't create groupings for indiv. sites 4 & 6 b/c not enough data
+# 4. Upper DC 1/2/4 vs. Lower 6/8/9
+# 5. Upper DC 1/2 vs. Lower 4/6/8/9
+# 6. Upper DC 1/2/4/6 vs. Lower 8/9
+# 7. Upper DC 1/2/4 vs. Lower DC 8/9
+# 8. Upper DC 1/2 vs. Lower 6/8/9
+
+
+#### UPPER DC POSSIBLE GROUPINGS ####
+
+## GROUPING 1 // UDC 1:
+UDC1 <- subset(bio, Site %in% c(1,2))
+
+## METADATA MATRIX
+UDC1.META <- UDC1[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+UDC1.BMI <- UDC1[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+UDC1.ENV <- UDC1[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+UDC1.BWC <- UDC1[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+UDC1.BIOVEC <- UDC1[,c(77:101)] # Biological vectors only
+
+UDC1.CLIM <- UDC1[,c(147:164)] # Climate vectors only
+
+UDC1.WQ <- UDC1[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+UDC1.flow <- UDC1[,c(102:105)] # Flow categories
+UDC1.season <- UDC1[,c(6)] # Season only
+
+
+
+## GROUPING 2 // UDC 2:
+UDC2 <- subset(bio, Site %in% c(1,2,4))
+
+## METADATA MATRIX
+UDC2.META <- UDC2[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+UDC2.BMI <- UDC2[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+UDC2.ENV <- UDC2[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+UDC2.BWC <- UDC2[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+UDC2.BIOVEC <- UDC2[,c(77:101)] # Biological vectors only
+
+UDC2.CLIM <- UDC2[,c(147:164)] # Climate vectors only
+
+UDC2.WQ <- UDC2[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+UDC2.flow <- UDC2[,c(102:105)] # Flow categories
+UDC2.season <- UDC2[,c(6)] # Season only
+
+
+
+## GROUPING 3 // UDC 3:
+UDC3 <- subset(bio, Site %in% c(1,2,4,6))
+
+## METADATA MATRIX
+UDC3.META <- UDC3[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+UDC3.BMI <- UDC3[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+UDC3.ENV <- UDC3[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+UDC3.BWC <- UDC3[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+UDC3.BIOVEC <- UDC3[,c(77:101)] # Biological vectors only
+
+UDC3.CLIM <- UDC3[,c(147:164)] # Climate vectors only
+
+UDC3.WQ <- UDC3[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+UDC3.flow <- UDC3[,c(102:105)] # Flow categories
+UDC3.season <- UDC3[,c(6)] # Season only
+
+
+
+
+#### MIDDLE DC POSSIBLE GROUPING(S) ####
+
+## GROUPING 1 // MDC 1
+MDC1 <- subset(bio, Site %in% c(4,6))
+
+## METADATA MATRIX
+MDC1.META <- MDC1[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+MDC1.BMI <- MDC1[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+MDC1.ENV <- MDC1[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+MDC1.BWC <- MDC1[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+MDC1.BIOVEC <- MDC1[,c(77:101)] # Biological vectors only
+
+MDC1.CLIM <- MDC1[,c(147:164)] # Climate vectors only
+
+MDC1.WQ <- MDC1[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+MDC1.flow <- MDC1[,c(102:105)] # Flow categories
+MDC1.season <- MDC1[,c(6)] # Season only
+
+
+
+
+
+#### LOWER DC POSSIBLE GROUPINGS ####
+
+## GROUPING 1 // LDC 1
+LDC1 <- subset(bio, Site %in% c(8,9))
+
+## METADATA MATRIX
+LDC1.META <- LDC1[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+LDC1.BMI <- LDC1[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+LDC1.ENV <- LDC1[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+LDC1.BWC <- LDC1[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+LDC1.BIOVEC <- LDC1[,c(77:101)] # Biological vectors only
+
+LDC1.CLIM <- LDC1[,c(147:164)] # Climate vectors only
+
+LDC1.WQ <- LDC1[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+LDC1.flow <- LDC1[,c(102:105)] # Flow categories
+LDC1.season <- LDC1[,c(6)] # Season only
+
+
+
+## GROUPING 2 // LDC 2
+LDC2 <- subset(bio, Site %in% c(6,8,9))
+
+## METADATA MATRIX
+LDC2.META <- LDC2[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+LDC2.BMI <- LDC2[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+LDC2.ENV <- LDC2[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+LDC2.BWC <- LDC2[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+LDC2.BIOVEC <- LDC2[,c(77:101)] # Biological vectors only
+
+LDC2.CLIM <- LDC2[,c(147:164)] # Climate vectors only
+
+LDC2.WQ <- LDC2[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+LDC2.flow <- LDC2[,c(102:105)] # Flow categories
+LDC2.season <- LDC2[,c(6)] # Season only
+
+
+
+## GROUPING 3 // LDC 3
+LDC3 <- subset(bio, Site %in% c(4,6,8,9))
+
+## METADATA MATRIX
+LDC3.META <- LDC3[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+LDC3.BMI <- LDC3[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+LDC3.ENV <- LDC3[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+LDC3.BWC <- LDC3[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+LDC3.BIOVEC <- LDC3[,c(77:101)] # Biological vectors only
+
+LDC3.CLIM <- LDC3[,c(147:164)] # Climate vectors only
+
+LDC3.WQ <- LDC3[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+LDC3.flow <- LDC3[,c(102:105)] # Flow categories
+LDC3.season <- LDC3[,c(6)] # Season only
+
+
+
+
+
+#### TRIBUTARY GROUPINGS (THESE REMAIN THE SAME THROUGHOUT) ####
+
+## LITTLE DC  // LtDC
+LtDC <- subset(bio, Site %in% c(11,12,13))
+
+## METADATA MATRIX
+LtDC.META <- LtDC[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+LtDC.BMI <- LtDC[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+LtDC.ENV <- LtDC[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+LtDC.BWC <- LtDC[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+LtDC.BIOVEC <- LtDC[,c(77:101)] # Biological vectors only
+
+LtDC.CLIM <- LtDC[,c(147:164)] # Climate vectors only
+
+LtDC.WQ <- LtDC[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+LtDC.flow <- LtDC[,c(102:105)] # Flow categories
+LtDC.season <- LtDC[,c(6)] # Season only
+
+
+
+## SQUIRREL CREEK  // SC
+SC <- subset(bio, Site %in% c(15,16))
+
+## METADATA MATRIX
+SC.META <- SC[,c(1:6)] # Sample meta data (identifiers)
+
+## BIOLOGICAL/BMI DATA MATRIX
+SC.BMI <- SC[,c(7:76)] # Note - BMI numbers must be numeric
+
+## ENVIRONMENTAL DATA MATRICES
+SC.ENV <- SC[,c(1:7, 76:164)] # All environmental variables: meta, bio/WQ/climate, & flow cats
+
+SC.BWC <- SC[,c(77:101,106:164)] # Bio, WQ, climate (aka BWC) vars only
+
+SC.BIOVEC <- SC[,c(77:101)] # Biological vectors only
+
+SC.CLIM <- SC[,c(147:164)] # Climate vectors only
+
+SC.WQ <- SC[,c(106:146)] # WQ vectors only
+
+# CATEGORICAL VARIABLES
+SC.flow <- SC[,c(102:105)] # Flow categories
+SC.season <- SC[,c(6)] # Season only
+```
+
+```{r UDC 1 - Rare Removed + WDS Ordination}
+UDC1.wds <- wisconsin(UDC1.BMI)
+
+# Run the ordination
+UDC1.wds.model <- metaMDS(UDC1.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(UDC1.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(UDC1.wds.model)
+
+# Calculate goodness of fit
+gof.UDC1 <- goodness(object = UDC1.wds.model)
+gof.UDC1
+
+plot(UDC1.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+UDC1Cat1.WDS.MRPP <- mrpp(UDC1.wds, UDC1.flow$Cat1, permutations = 999, distance = "bray")
+print(UDC1Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+UDC1Cat3.WDS.MRPP <- mrpp(UDC1.wds, UDC1.flow$Cat3, permutations = 999, distance = "bray")
+print(UDC1Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+UDC1Cat6.WDS.MRPP <- mrpp(UDC1.wds, UDC1.flow$Cat6, permutations = 999, distance = "bray")
+print(UDC1Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+UDC1Cat12.WDS.MRPP <- mrpp(UDC1.wds, UDC1.flow$Cat12, permutations = 999, distance = "bray")
+print(UDC1Cat12.WDS.MRPP)
+```
+
+``` {r UDC 1 - Significant envrionmental variables}
+# # Dimensions 1 & 2 (default)
+# # Fit environmental vectors
+# UDC1.fit_12.wds <- envfit(UDC1.wds.model, UDC1.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.UDC1.wds <- as.data.frame(UDC1.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.UDC1.wds     <- UDC1.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.UDC1.wds  <- UDC1.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC1.sigvec_12.wds <- arrows_12.UDC1.wds %>%
+#   mutate(R2 = r2_12.UDC1.wds, pval = pvals_12.UDC1.wds, Variable = rownames(arrows_12.UDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC1.sigvec_12.wds <- UDC1.sigvec_12.wds %>% filter(pval < 0.05)
+# 
+# 
+# # Dimensions 1 & 3
+# # Fit environmental vectors
+# UDC1.fit_13.wds <- envfit(UDC1.wds.model, UDC1.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.UDC1.wds <- as.data.frame(UDC1.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.UDC1.wds     <- UDC1.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.UDC1.wds  <- UDC1.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC1.sigvec_13.wds <- arrows_13.UDC1.wds %>%
+#   mutate(R2 = r2_13.UDC1.wds, pval = pvals_13.UDC1.wds, Variable = rownames(arrows_13.UDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC1.sigvec_13.wds <- UDC1.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+# 
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# UDC1.fit_23.wds <- envfit(UDC1.wds.model, UDC1.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.UDC1.wds <- as.data.frame(UDC1.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.UDC1.wds     <- UDC1.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.UDC1.wds  <- UDC1.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC1.sigvec_23.wds <- arrows_23.UDC1.wds %>%
+#   mutate(R2 = r2_23.UDC1.wds, pval = pvals_23.UDC1.wds, Variable = rownames(arrows_23.UDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC1.sigvec_23.wds <- UDC1.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r UDC 1 - Flow Cat 1 Model}
+# Model with biological data
+# plot(UDC1.wds.model, display = "sites", type = "n", main = "UDC 1 Flow Cat 1");   # Creates empty plot
+# points(UDC1.wds.model, pch = 21, bg = UDC1$Cat1,                   # Formats points
+#        col = "black",cex = 1.5);
+# legend("topright", legend = names(color.by.cat),                 # Formats legend
+#        fill = color.by.cat, title = "Flow", bty = "n");
+# ordiellipse(UDC1.wds.model, groups = UDC1$Cat1,                    # Adds ellipses
+#            col = c("coral3", "burlywood", "lightskyblue"),
+#            draw = "polygon", label = T, cex = 0.5)
+```
+
+```{r UDC 1 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+UDC1.scores <- scores(UDC1.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r UDC 1 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+UDC1.fit1_2.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(UDC1.scores[,1], UDC1.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC1.fit1_3.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(UDC1.scores[,1], UDC1.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC1.fit2_3.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(UDC1.scores[,2], UDC1.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC1.fit2_3.bio, p.max = 0.05)
+```
+
+```{r UDC 1 - Season + Bio Vars}
+## DIMENSIONS 1 and 2
+# UDC1.fit1_2.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(1,2))
+# 
+# plot(UDC1.scores[,1], UDC1.scores[,2], # Plots the 1 vs 2 dimensions
+#      xlab = "NMDS1", ylab = "NMDS2",
+#      pch = 21, bg = color.by.season,  
+#      col = "black", cex = 1.5,
+#      main = "UDC 1 by Season");
+# legend("topright", legend = names(color.by.season),              
+#        fill = color.by.season, title = "Flow", bty = "n");
+# ordiellipse(UDC1.wds.model, groups = UDC1$UDC1.season,
+#             choices = c(1,2), # For ellipses around axes 1 and 2
+#             col = c("cyan3","darkcyan"),
+#             draw = "polygon", label = T, cex = 0.5);
+# plot(UDC1.fit1_2.bio, p.max = 0.05)
+```
+
+```{r UDC 1 - Cat 1 Ordination - all sig climate variables}
+## DIMENSIONS 1 and 2
+UDC1.fit1_2.clim <- envfit(UDC1.wds.model, UDC1.CLIM, permutations = 999, choices = c(1,2))
+
+plot(UDC1.scores[,1], UDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 1v2 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC1.fit1_3.clim <- envfit(UDC1.wds.model, UDC1.CLIM, permutations = 999, choices = c(1,3))
+
+plot(UDC1.scores[,1], UDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 1v3 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC1.fit2_3.clim <- envfit(UDC1.wds.model, UDC1.CLIM, permutations = 999, choices = c(2,3))
+
+plot(UDC1.scores[,2], UDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 2v3 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit2_3.clim, p.max = 0.05)
+```
+
+```{r UDC 1 - Cat 1 Ordination - all sig WQ variables}
+## DIMENSIONS 1 and 2
+UDC1.fit1_2.wq <- envfit(UDC1.wds.model, UDC1.WQ, permutations = 999, choices = c(1,2)) 
+
+plot(UDC1.scores[,1], UDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 1v2 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC1.fit1_3.wq <- envfit(UDC1.wds.model, UDC1.WQ, permutations = 999, choices = c(1,3)) 
+
+plot(UDC1.scores[,1], UDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 1v3 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC1.fit2_3.wq <- envfit(UDC1.wds.model, UDC1.WQ, permutations = 999, choices = c(2,3)) 
+
+plot(UDC1.scores[,2], UDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 1-month Flow\n 2v3 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit2_3.wq, p.max = 0.05)
+```
+```{r UDC 1 - Cat 3 Bio}
+## DIMENSIONS 1 and 2
+UDC1.fit1_2.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(UDC1.scores[,1], UDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC1.fit1_3.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(UDC1.scores[,1], UDC1.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC1.fit2_3.bio <- envfit(UDC1.wds.model, UDC1.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(UDC1.scores[,2], UDC1.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC1.fit2_3.bio, p.max = 0.05)
+```
+
+```{r UDC 1 - Cat 3 Ordination - all sig climate variables}
+## DIMENSIONS 1 and 2
+UDC1.fit1_2.clim <- envfit(UDC1.wds.model, UDC1.CLIM, permutations = 999, choices = c(1,2))
+
+plot(UDC1.scores[,1], UDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 1v2 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC1.fit1_3.clim <- envfit(UDC1.wds.model, UDC1.CLIM, permutations = 999, choices = c(1,3))
+
+plot(UDC1.scores[,1], UDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 1v3 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC1.fit2_3.clim <- envfit(UDC1.wds.model, UDC1.CLIM, permutations = 999, choices = c(2,3))
+
+plot(UDC1.scores[,2], UDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 2v3 dimensions \n Sig clim vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit2_3.clim, p.max = 0.05)
+```
+```{r UDC 1 - Cat 3 Ordination - all sig WQ variables}
+## DIMENSIONS 1 and 2
+UDC1.fit1_2.wq <- envfit(UDC1.wds.model, UDC1.WQ, permutations = 999, choices = c(1,2)) 
+
+plot(UDC1.scores[,1], UDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC1.fit1_3.wq <- envfit(UDC1.wds.model, UDC1.WQ, permutations = 999, choices = c(1,3)) 
+
+plot(UDC1.scores[,1], UDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC1.fit2_3.wq <- envfit(UDC1.wds.model, UDC1.WQ, permutations = 999, choices = c(2,3)) 
+
+plot(UDC1.scores[,2], UDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 1: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC1.wds.model, groups = UDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC1.fit2_3.wq, p.max = 0.05)
+```
+```{r UDC 2 - Rare Removed + WDS Ordination}
+UDC2.wds <- wisconsin(UDC2.BMI)
+
+# Run the ordination
+UDC2.wds.model <- metaMDS(UDC2.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(UDC2.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(UDC2.wds.model)
+
+# Calculate goodness of fit
+gof.UDC2 <- goodness(object = UDC2.wds.model)
+gof.UDC2
+
+plot(UDC2.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+UDC2Cat1.WDS.MRPP <- mrpp(UDC2.wds, UDC2.flow$Cat1, permutations = 999, distance = "bray")
+print(UDC2Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+UDC2Cat3.WDS.MRPP <- mrpp(UDC2.wds, UDC2.flow$Cat3, permutations = 999, distance = "bray")
+print(UDC2Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+UDC2Cat6.WDS.MRPP <- mrpp(UDC2.wds, UDC2.flow$Cat6, permutations = 999, distance = "bray")
+print(UDC2Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+UDC2Cat12.WDS.MRPP <- mrpp(UDC2.wds, UDC2.flow$Cat12, permutations = 999, distance = "bray")
+print(UDC2Cat12.WDS.MRPP)
+```
+``` {r UDC 2 - Significant envrionmental variables}
+# Dimensions 1 & 2 (default)
+# Fit environmental vectors
+# UDC2.fit_12.wds <- envfit(UDC2.wds.model, UDC2.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.UDC2.wds <- as.data.frame(UDC2.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.UDC2.wds     <- UDC2.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.UDC2.wds  <- UDC2.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC2.sigvec_12.wds <- arrows_12.UDC2.wds %>%
+#   mutate(R2 = r2_12.UDC2.wds, pval = pvals_12.UDC2.wds, Variable = rownames(arrows_12.UDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC2.sigvec_12.wds <- UDC2.sigvec_12.wds %>% filter(pval < 0.05)
+
+
+# Dimensions 1 & 3
+# Fit environmental vectors
+# UDC2.fit_13.wds <- envfit(UDC2.wds.model, UDC2.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.UDC2.wds <- as.data.frame(UDC2.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.UDC2.wds     <- UDC2.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.UDC2.wds  <- UDC2.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC2.sigvec_13.wds <- arrows_13.UDC2.wds %>%
+#   mutate(R2 = r2_13.UDC2.wds, pval = pvals_13.UDC2.wds, Variable = rownames(arrows_13.UDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC2.sigvec_13.wds <- UDC2.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+# 
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# UDC2.fit_23.wds <- envfit(UDC2.wds.model, UDC2.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.UDC2.wds <- as.data.frame(UDC2.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.UDC2.wds     <- UDC2.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.UDC2.wds  <- UDC2.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC2.sigvec_23.wds <- arrows_23.UDC2.wds %>%
+#   mutate(R2 = r2_23.UDC2.wds, pval = pvals_23.UDC2.wds, Variable = rownames(arrows_23.UDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC2.sigvec_23.wds <- UDC2.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r UDC 2 - Flow Cat 1 Model}
+# Model with biological data
+# plot(UDC2.wds.model, display = "sites", type = "n", main = "UDC 2 Flow Cat 1");   # Creates empty plot
+# points(UDC2.wds.model, pch = 21, bg = UDC2$Cat1,                   # Formats points
+#        col = "black",cex = 1.5);
+# legend("topright", legend = names(color.by.cat),                 # Formats legend
+#        fill = color.by.cat, title = "Flow", bty = "n");
+# ordiellipse(UDC2.wds.model, groups = UDC2$Cat1,                    # Adds ellipses
+#            col = c("coral3", "burlywood", "lightskyblue"),
+#            draw = "polygon", label = T, cex = 0.5)
+```
+
+```{r UDC 2 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+UDC2.scores <- scores(UDC2.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r UDC 2 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+UDC2.fit1_2.bio <- envfit(UDC2.wds.model, UDC2.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(UDC2.scores[,1], UDC2.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC2.fit1_3.bio <- envfit(UDC2.wds.model, UDC2.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(UDC2.scores[,1], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC2.fit2_3.bio <- envfit(UDC2.wds.model, UDC2.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(UDC2.scores[,2], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit2_3.bio, p.max = 0.05)
+```
+
+```{r UDC 2 - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+UDC2.fit1_2.clim <- envfit(UDC2.wds.model, UDC2.CLIM, permutations = 999, choices = c(1,2))
+
+plot(UDC2.scores[,1], UDC2.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC2.fit1_3.clim <- envfit(UDC2.wds.model, UDC2.CLIM, permutations = 999, choices = c(1,3))
+
+plot(UDC2.scores[,1], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC2.fit2_3.clim <- envfit(UDC2.wds.model, UDC2.CLIM, permutations = 999, choices = c(2,3))
+
+plot(UDC2.scores[,2], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit2_3.clim, p.max = 0.05)
+```
+```{r UDC 2 - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+UDC2.fit1_2.wq<- envfit(UDC2.wds.model, UDC2.WQ, permutations = 999, choices = c(1,2))
+
+plot(UDC2.scores[,1], UDC2.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC2.fit1_3.wq <- envfit(UDC2.wds.model, UDC2.WQ, permutations = 999, choices = c(1,3))
+
+plot(UDC2.scores[,1], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC2.fit2_3.wq <- envfit(UDC2.wds.model, UDC2.WQ, permutations = 999, choices = c(2,3))
+
+plot(UDC2.scores[,2], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit2_3.wq, p.max = 0.05)
+```
+
+```{r UDC 2 - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+UDC2.fit1_2.bio <- envfit(UDC2.wds.model, UDC2.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(UDC2.scores[,1], UDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC2.fit1_3.bio <- envfit(UDC2.wds.model, UDC2.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(UDC2.scores[,1], UDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC2.fit2_3.bio <- envfit(UDC2.wds.model, UDC2.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(UDC2.scores[,2], UDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit2_3.bio, p.max = 0.05)
+```
+
+```{r UDC 2 - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+UDC2.fit1_2.clim <- envfit(UDC2.wds.model, UDC2.CLIM, permutations = 999, choices = c(1,2))
+
+plot(UDC2.scores[,1], UDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC2.fit1_3.clim <- envfit(UDC2.wds.model, UDC2.CLIM, permutations = 999, choices = c(1,3))
+
+plot(UDC2.scores[,1], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC2.fit2_3.clim <- envfit(UDC2.wds.model, UDC2.CLIM, permutations = 999, choices = c(2,3))
+
+plot(UDC2.scores[,2], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit2_3.clim, p.max = 0.05)
+```
+
+```{r UDC 2 - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+UDC2.fit1_2.wq<- envfit(UDC2.wds.model, UDC2.WQ, permutations = 999, choices = c(1,2))
+
+plot(UDC2.scores[,1], UDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC2.fit1_3.wq <- envfit(UDC2.wds.model, UDC2.WQ, permutations = 999, choices = c(1,3))
+
+plot(UDC2.scores[,1], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC2.fit2_3.wq <- envfit(UDC2.wds.model, UDC2.WQ, permutations = 999, choices = c(2,3))
+
+plot(UDC2.scores[,2], UDC2.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 2: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC2.wds.model, groups = UDC2.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC2.fit2_3.wq, p.max = 0.05)
+```
+```{r UDC 3 - Rare Removed + WDS Ordination}
+UDC3.wds <- wisconsin(UDC3.BMI)
+
+# Run the ordination
+UDC3.wds.model <- metaMDS(UDC3.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(UDC3.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(UDC3.wds.model)
+
+# Calculate goodness of fit
+gof.UDC3 <- goodness(object = UDC3.wds.model)
+gof.UDC3
+
+plot(UDC3.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+UDC3Cat1.WDS.MRPP <- mrpp(UDC3.wds, UDC3.flow$Cat1, permutations = 999, distance = "bray")
+print(UDC3Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+UDC3Cat3.WDS.MRPP <- mrpp(UDC3.wds, UDC3.flow$Cat3, permutations = 999, distance = "bray")
+print(UDC3Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+UDC3Cat6.WDS.MRPP <- mrpp(UDC3.wds, UDC3.flow$Cat6, permutations = 999, distance = "bray")
+print(UDC3Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+UDC3Cat12.WDS.MRPP <- mrpp(UDC3.wds, UDC3.flow$Cat12, permutations = 999, distance = "bray")
+print(UDC3Cat12.WDS.MRPP)
+```
+
+``` {r UDC 3 - Significant envrionmental variables}
+# Dimensions 1 & 2 (default)
+# Fit environmental vectors
+# UDC3.fit_12.wds <- envfit(UDC3.wds.model, UDC3.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.UDC3.wds <- as.data.frame(UDC3.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.UDC3.wds     <- UDC3.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.UDC3.wds  <- UDC3.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC3.sigvec_12.wds <- arrows_12.UDC3.wds %>%
+#   mutate(R2 = r2_12.UDC3.wds, pval = pvals_12.UDC3.wds, Variable = rownames(arrows_12.UDC3.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC3.sigvec_12.wds <- UDC3.sigvec_12.wds %>% filter(pval < 0.05)
+#
+#
+# Dimensions 1 & 3
+# Fit environmental vectors
+# UDC3.fit_13.wds <- envfit(UDC3.wds.model, UDC3.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.UDC3.wds <- as.data.frame(UDC3.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.UDC3.wds     <- UDC3.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.UDC3.wds  <- UDC3.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC3.sigvec_13.wds <- arrows_13.UDC3.wds %>%
+#   mutate(R2 = r2_13.UDC3.wds, pval = pvals_13.UDC3.wds, Variable = rownames(arrows_13.UDC3.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC3.sigvec_13.wds <- UDC3.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+#
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# UDC3.fit_23.wds <- envfit(UDC3.wds.model, UDC3.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.UDC3.wds <- as.data.frame(UDC3.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.UDC3.wds     <- UDC3.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.UDC3.wds  <- UDC3.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# UDC3.sigvec_23.wds <- arrows_23.UDC3.wds %>%
+#   mutate(R2 = r2_23.UDC3.wds, pval = pvals_23.UDC3.wds, Variable = rownames(arrows_23.UDC3.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# UDC3.sigvec_23.wds <- UDC3.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r UDC 3 - Flow Cat 1 Model}
+# Model with biological data
+# plot(UDC3.wds.model, display = "sites", type = "n", main = "UDC 3 Flow Cat 1");   # Creates empty plot
+# points(UDC3.wds.model, pch = 21, bg = UDC3$Cat1,                   # Formats points
+#        col = "black",cex = 1.5);
+# legend("topright", legend = names(color.by.cat),                 # Formats legend
+#        fill = color.by.cat, title = "Flow", bty = "n");
+# ordiellipse(UDC3.wds.model, groups = UDC3$Cat1,                    # Adds ellipses
+#            col = c("coral3", "burlywood", "lightskyblue"),
+#            draw = "polygon", label = T, cex = 0.5)
+```
+
+```{r UDC 3 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+UDC3.scores <- scores(UDC3.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r UDC 3 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+UDC3.fit1_2.bio <- envfit(UDC3.wds.model, UDC3.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(UDC3.scores[,1], UDC3.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC3.fit1_3.bio <- envfit(UDC3.wds.model, UDC3.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(UDC3.scores[,1], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC3.fit2_3.bio <- envfit(UDC3.wds.model, UDC3.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(UDC3.scores[,2], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit2_3.bio, p.max = 0.05)
+```
+```{r UDC 3 - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+UDC3.fit1_2.clim <- envfit(UDC3.wds.model, UDC3.CLIM, permutations = 999, choices = c(1,2))
+
+plot(UDC3.scores[,1], UDC3.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC3.fit1_3.clim <- envfit(UDC3.wds.model, UDC3.CLIM, permutations = 999, choices = c(1,3))
+
+plot(UDC3.scores[,1], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC3.fit2_3.clim <- envfit(UDC3.wds.model, UDC3.CLIM, permutations = 999, choices = c(2,3))
+
+plot(UDC3.scores[,2], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit2_3.clim, p.max = 0.05)
+```
+```{r UDC 3 - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+UDC3.fit1_2.wq<- envfit(UDC3.wds.model, UDC3.WQ, permutations = 999, choices = c(1,2))
+
+plot(UDC3.scores[,1], UDC3.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC3.fit1_3.wq <- envfit(UDC3.wds.model, UDC3.WQ, permutations = 999, choices = c(1,3))
+
+plot(UDC3.scores[,1], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC3.fit2_3.wq <- envfit(UDC3.wds.model, UDC3.WQ, permutations = 999, choices = c(2,3))
+
+plot(UDC3.scores[,2], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat1,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit2_3.wq, p.max = 0.05)
+```
+```{r UDC 3 - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+UDC3.fit1_2.bio <- envfit(UDC3.wds.model, UDC3.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(UDC3.scores[,1], UDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC3.fit1_3.bio <- envfit(UDC3.wds.model, UDC3.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(UDC3.scores[,1], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC3.fit2_3.bio <- envfit(UDC3.wds.model, UDC3.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(UDC3.scores[,2], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit2_3.bio, p.max = 0.05)
+```
+```{r UDC 3 - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+UDC3.fit1_2.clim <- envfit(UDC3.wds.model, UDC3.CLIM, permutations = 999, choices = c(1,2))
+
+plot(UDC3.scores[,1], UDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC3.fit1_3.clim <- envfit(UDC3.wds.model, UDC3.CLIM, permutations = 999, choices = c(1,3))
+
+plot(UDC3.scores[,1], UDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC3.fit2_3.clim <- envfit(UDC3.wds.model, UDC3.CLIM, permutations = 999, choices = c(2,3))
+
+plot(UDC3.scores[,2], UDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit2_3.clim, p.max = 0.05)
+```
+```{r UDC 3 - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+UDC3.fit1_2.wq<- envfit(UDC3.wds.model, UDC3.WQ, permutations = 999, choices = c(1,2))
+
+plot(UDC3.scores[,1], UDC3.scores[,2], # Plots the 1 vs 2 dimensions
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(1,2), # For ellipses around axes 1 and 2
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+UDC3.fit1_3.wq <- envfit(UDC3.wds.model, UDC3.WQ, permutations = 999, choices = c(1,3))
+
+plot(UDC3.scores[,1], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(1,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+UDC3.fit2_3.wq <- envfit(UDC3.wds.model, UDC3.WQ, permutations = 999, choices = c(2,3))
+
+plot(UDC3.scores[,2], UDC3.scores[,3], # Plots the 1 vs 3 dimensions
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[UDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="UDC 3: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(UDC3.wds.model, groups = UDC3.flow$Cat3,
+            choices = c(2,3), # For ellipses around axes 1 and 3
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(UDC3.fit2_3.wq, p.max = 0.05)
+```
+```{r MDC 1 - Rare Removed + WDS Ordination}
+MDC1.wds <- wisconsin(MDC1.BMI)
+
+# Run the ordination
+MDC1.wds.model <- metaMDS(MDC1.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(MDC1.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(MDC1.wds.model)
+
+# Calculate goodness of fit
+gof.MDC1 <- goodness(object = MDC1.wds.model)
+gof.MDC1
+
+plot(MDC1.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+MDC1Cat1.WDS.MRPP <- mrpp(MDC1.wds, MDC1.flow$Cat1, permutations = 999, distance = "bray")
+print(MDC1Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+MDC1Cat3.WDS.MRPP <- mrpp(MDC1.wds, MDC1.flow$Cat3, permutations = 999, distance = "bray")
+print(MDC1Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+MDC1Cat6.WDS.MRPP <- mrpp(MDC1.wds, MDC1.flow$Cat6, permutations = 999, distance = "bray")
+print(MDC1Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+MDC1Cat12.WDS.MRPP <- mrpp(MDC1.wds, MDC1.flow$Cat12, permutations = 999, distance = "bray")
+print(MDC1Cat12.WDS.MRPP)
+```
+
+``` {r MDC 1 - Significant envrionmental variables}
+# Dimensions 1 & 2 (default)
+# Fit environmental vectors
+# MDC1.fit_12.wds <- envfit(MDC1.wds.model, MDC1.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.MDC1.wds <- as.data.frame(MDC1.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.MDC1.wds     <- MDC1.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.MDC1.wds  <- MDC1.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# MDC1.sigvec_12.wds <- arrows_12.MDC1.wds %>%
+#   mutate(R2 = r2_12.MDC1.wds, pval = pvals_12.MDC1.wds, Variable = rownames(arrows_12.MDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# MDC1.sigvec_12.wds <- MDC1.sigvec_12.wds %>% filter(pval < 0.05)
+#
+#
+# Dimensions 1 & 3
+# Fit environmental vectors
+# MDC1.fit_13.wds <- envfit(MDC1.wds.model, MDC1.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.MDC1.wds <- as.data.frame(MDC1.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.MDC1.wds     <- MDC1.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.MDC1.wds  <- MDC1.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# MDC1.sigvec_13.wds <- arrows_13.MDC1.wds %>%
+#   mutate(R2 = r2_13.MDC1.wds, pval = pvals_13.MDC1.wds, Variable = rownames(arrows_13.MDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# MDC1.sigvec_13.wds <- MDC1.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+#
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# MDC1.fit_23.wds <- envfit(MDC1.wds.model, MDC1.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.MDC1.wds <- as.data.frame(MDC1.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.MDC1.wds     <- MDC1.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.MDC1.wds  <- MDC1.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# MDC1.sigvec_23.wds <- arrows_23.MDC1.wds %>%
+#   mutate(R2 = r2_23.MDC1.wds, pval = pvals_23.MDC1.wds, Variable = rownames(arrows_23.MDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# MDC1.sigvec_23.wds <- MDC1.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r MDC 1 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+MDC1.scores <- scores(MDC1.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r MDC 1 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+MDC1.fit1_2.bio <- envfit(MDC1.wds.model, MDC1.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(MDC1.scores[,1], MDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+MDC1.fit1_3.bio <- envfit(MDC1.wds.model, MDC1.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(MDC1.scores[,1], MDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+MDC1.fit2_3.bio <- envfit(MDC1.wds.model, MDC1.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(MDC1.scores[,2], MDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit2_3.bio, p.max = 0.05)
+```
+
+```{r MDC 1 - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+MDC1.fit1_2.clim <- envfit(MDC1.wds.model, MDC1.CLIM, permutations = 999, choices = c(1,2))
+
+plot(MDC1.scores[,1], MDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+MDC1.fit1_3.clim <- envfit(MDC1.wds.model, MDC1.CLIM, permutations = 999, choices = c(1,3))
+
+plot(MDC1.scores[,1], MDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+MDC1.fit2_3.clim <- envfit(MDC1.wds.model, MDC1.CLIM, permutations = 999, choices = c(2,3))
+
+plot(MDC1.scores[,2], MDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit2_3.clim, p.max = 0.05)
+```
+```{r MDC 1 - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+MDC1.fit1_2.wq <- envfit(MDC1.wds.model, MDC1.WQ, permutations = 999, choices = c(1,2))
+
+plot(MDC1.scores[,1], MDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+MDC1.fit1_3.wq <- envfit(MDC1.wds.model, MDC1.WQ, permutations = 999, choices = c(1,3))
+
+plot(MDC1.scores[,1], MDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+MDC1.fit2_3.wq <- envfit(MDC1.wds.model, MDC1.WQ, permutations = 999, choices = c(2,3))
+
+plot(MDC1.scores[,2], MDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit2_3.wq, p.max = 0.05)
+```
+
+```{r MDC 1 - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+MDC1.fit1_2.bio <- envfit(MDC1.wds.model, MDC1.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(MDC1.scores[,1], MDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+MDC1.fit1_3.bio <- envfit(MDC1.wds.model, MDC1.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(MDC1.scores[,1], MDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+MDC1.fit2_3.bio <- envfit(MDC1.wds.model, MDC1.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(MDC1.scores[,2], MDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit2_3.bio, p.max = 0.05)
+```
+
+```{r MDC 1 - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+MDC1.fit1_2.clim <- envfit(MDC1.wds.model, MDC1.CLIM, permutations = 999, choices = c(1,2))
+
+plot(MDC1.scores[,1], MDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+MDC1.fit1_3.clim <- envfit(MDC1.wds.model, MDC1.CLIM, permutations = 999, choices = c(1,3))
+
+plot(MDC1.scores[,1], MDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+MDC1.fit2_3.clim <- envfit(MDC1.wds.model, MDC1.CLIM, permutations = 999, choices = c(2,3))
+
+plot(MDC1.scores[,2], MDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit2_3.clim, p.max = 0.05)
+```
+
+```{r MDC 1 - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+MDC1.fit1_2.wq <- envfit(MDC1.wds.model, MDC1.WQ, permutations = 999, choices = c(1,2))
+
+plot(MDC1.scores[,1], MDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+MDC1.fit1_3.wq <- envfit(MDC1.wds.model, MDC1.WQ, permutations = 999, choices = c(1,3))
+
+plot(MDC1.scores[,1], MDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+MDC1.fit2_3.wq <- envfit(MDC1.wds.model, MDC1.WQ, permutations = 999, choices = c(2,3))
+
+plot(MDC1.scores[,2], MDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[MDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="MDC 1: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(MDC1.wds.model, groups = MDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(MDC1.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LDC 1 - Rare Removed + WDS Ordination}
+LDC1.wds <- wisconsin(LDC1.BMI)
+
+# Run the ordination
+LDC1.wds.model <- metaMDS(LDC1.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(LDC1.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(LDC1.wds.model)
+
+# Calculate goodness of fit
+gof.LDC1 <- goodness(object = LDC1.wds.model)
+gof.LDC1
+
+plot(LDC1.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+LDC1Cat1.WDS.MRPP <- mrpp(LDC1.wds, LDC1.flow$Cat1, permutations = 999, distance = "bray")
+print(LDC1Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+LDC1Cat3.WDS.MRPP <- mrpp(LDC1.wds, LDC1.flow$Cat3, permutations = 999, distance = "bray")
+print(LDC1Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+LDC1Cat6.WDS.MRPP <- mrpp(LDC1.wds, LDC1.flow$Cat6, permutations = 999, distance = "bray")
+print(LDC1Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+LDC1Cat12.WDS.MRPP <- mrpp(LDC1.wds, LDC1.flow$Cat12, permutations = 999, distance = "bray")
+print(LDC1Cat12.WDS.MRPP)
+```
+
+``` {r LCD 1 - Significant envrionmental variables}
+# Dimensions 1 & 2 (default)
+# Fit environmental vectors
+# LDC1.fit_12.wds <- envfit(LDC1.wds.model, LDC1.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.LDC1.wds <- as.data.frame(LDC1.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.LDC1.wds     <- LDC1.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.LDC1.wds  <- LDC1.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC1.sigvec_12.wds <- arrows_12.LDC1.wds %>%
+#   mutate(R2 = r2_12.LDC1.wds, pval = pvals_12.LDC1.wds, Variable = rownames(arrows_12.LDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC1.sigvec_12.wds <- LDC1.sigvec_12.wds %>% filter(pval < 0.05)
+#
+#
+# Dimensions 1 & 3
+# Fit environmental vectors
+# LDC1.fit_13.wds <- envfit(LDC1.wds.model, LDC1.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.LDC1.wds <- as.data.frame(LDC1.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.LDC1.wds     <- LDC1.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.LDC1.wds  <- LDC1.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC1.sigvec_13.wds <- arrows_13.LDC1.wds %>%
+#   mutate(R2 = r2_13.LDC1.wds, pval = pvals_13.LDC1.wds, Variable = rownames(arrows_13.LDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC1.sigvec_13.wds <- LDC1.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+#
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# LDC1.fit_23.wds <- envfit(LDC1.wds.model, LDC1.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.LDC1.wds <- as.data.frame(LDC1.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.LDC1.wds     <- LDC1.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.LDC1.wds  <- LDC1.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC1.sigvec_23.wds <- arrows_23.LDC1.wds %>%
+#   mutate(R2 = r2_23.LDC1.wds, pval = pvals_23.LDC1.wds, Variable = rownames(arrows_23.LDC1.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC1.sigvec_23.wds <- LDC1.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r LDC 1 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+LDC1.scores <- scores(LDC1.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r LDC 1 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+LDC1.fit1_2.bio <- envfit(LDC1.wds.model, LDC1.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LDC1.scores[,1], LDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC1.fit1_3.bio <- envfit(LDC1.wds.model, LDC1.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LDC1.scores[,1], LDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC1.fit2_3.bio <- envfit(LDC1.wds.model, LDC1.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LDC1.scores[,2], LDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LDC 1 - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+LDC1.fit1_2.clim <- envfit(LDC1.wds.model, LDC1.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LDC1.scores[,1], LDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC1.fit1_3.clim <- envfit(LDC1.wds.model, LDC1.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LDC1.scores[,1], LDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC1.fit2_3.clim <- envfit(LDC1.wds.model, LDC1.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LDC1.scores[,2], LDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit2_3.clim, p.max = 0.05)
+```
+
+```{r LDC 1 - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+LDC1.fit1_2.wq <- envfit(LDC1.wds.model, LDC1.WQ, permutations = 999, choices = c(1,2))
+
+plot(LDC1.scores[,1], LDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC1.fit1_3.wq <- envfit(LDC1.wds.model, LDC1.WQ, permutations = 999, choices = c(1,3))
+
+plot(LDC1.scores[,1], LDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC1.fit2_3.wq <- envfit(LDC1.wds.model, LDC1.WQ, permutations = 999, choices = c(2,3))
+
+plot(LDC1.scores[,2], LDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LDC 1 - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+LDC1.fit1_2.bio <- envfit(LDC1.wds.model, LDC1.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LDC1.scores[,1], LDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC1.fit1_3.bio <- envfit(LDC1.wds.model, LDC1.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LDC1.scores[,1], LDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC1.fit2_3.bio <- envfit(LDC1.wds.model, LDC1.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LDC1.scores[,2], LDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit2_3.bio, p.max = 0.05)
+```
+```{r LDC 1 - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+LDC1.fit1_2.clim <- envfit(LDC1.wds.model, LDC1.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LDC1.scores[,1], LDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC1.fit1_3.clim <- envfit(LDC1.wds.model, LDC1.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LDC1.scores[,1], LDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC1.fit2_3.clim <- envfit(LDC1.wds.model, LDC1.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LDC1.scores[,2], LDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit2_3.clim, p.max = 0.05)
+```
+```{r LDC 1 - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+LDC1.fit1_2.wq <- envfit(LDC1.wds.model, LDC1.WQ, permutations = 999, choices = c(1,2))
+
+plot(LDC1.scores[,1], LDC1.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC1.fit1_3.wq <- envfit(LDC1.wds.model, LDC1.WQ, permutations = 999, choices = c(1,3))
+
+plot(LDC1.scores[,1], LDC1.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC1.fit2_3.wq <- envfit(LDC1.wds.model, LDC1.WQ, permutations = 999, choices = c(2,3))
+
+plot(LDC1.scores[,2], LDC1.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC1.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 1: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC1.wds.model, groups = LDC1.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC1.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LDC 2 - Rare Removed + WDS Ordination}
+LDC2.wds <- wisconsin(LDC2.BMI)
+
+# Run the ordination
+LDC2.wds.model <- metaMDS(LDC2.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(LDC2.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(LDC2.wds.model)
+
+# Calculate goodness of fit
+gof.LDC2 <- goodness(object = LDC2.wds.model)
+gof.LDC2
+
+plot(LDC2.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+LDC2Cat1.WDS.MRPP <- mrpp(LDC2.wds, LDC2.flow$Cat1, permutations = 999, distance = "bray")
+print(LDC2Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+LDC2Cat3.WDS.MRPP <- mrpp(LDC2.wds, LDC2.flow$Cat3, permutations = 999, distance = "bray")
+print(LDC2Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+LDC2Cat6.WDS.MRPP <- mrpp(LDC2.wds, LDC2.flow$Cat6, permutations = 999, distance = "bray")
+print(LDC2Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+LDC2Cat12.WDS.MRPP <- mrpp(LDC2.wds, LDC2.flow$Cat12, permutations = 999, distance = "bray")
+print(LDC2Cat12.WDS.MRPP)
+```
+
+``` {r LCD 2 - Significant envrionmental variables}
+# Dimensions 1 & 2 (default)
+# Fit environmental vectors
+# LDC2.fit_12.wds <- envfit(LDC2.wds.model, LDC2.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.LDC2.wds <- as.data.frame(LDC2.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.LDC2.wds     <- LDC2.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.LDC2.wds  <- LDC2.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC2.sigvec_12.wds <- arrows_12.LDC2.wds %>%
+#   mutate(R2 = r2_12.LDC2.wds, pval = pvals_12.LDC2.wds, Variable = rownames(arrows_12.LDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC2.sigvec_12.wds <- LDC2.sigvec_12.wds %>% filter(pval < 0.05)
+#
+#
+# Dimensions 1 & 3
+# Fit environmental vectors
+# LDC2.fit_13.wds <- envfit(LDC2.wds.model, LDC2.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.LDC2.wds <- as.data.frame(LDC2.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.LDC2.wds     <- LDC2.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.LDC2.wds  <- LDC2.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC2.sigvec_13.wds <- arrows_13.LDC2.wds %>%
+#   mutate(R2 = r2_13.LDC2.wds, pval = pvals_13.LDC2.wds, Variable = rownames(arrows_13.LDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC2.sigvec_13.wds <- LDC2.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+#
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# LDC2.fit_23.wds <- envfit(LDC2.wds.model, LDC2.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.LDC2.wds <- as.data.frame(LDC2.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.LDC2.wds     <- LDC2.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.LDC2.wds  <- LDC2.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC2.sigvec_23.wds <- arrows_23.LDC2.wds %>%
+#   mutate(R2 = r2_23.LDC2.wds, pval = pvals_23.LDC2.wds, Variable = rownames(arrows_23.LDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC2.sigvec_23.wds <- LDC2.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r LDC 2 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+LDC2.scores <- scores(LDC2.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r LDC 2 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+LDC2.fit1_2.bio <- envfit(LDC2.wds.model, LDC2.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LDC2.scores[,1], LDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC2.fit1_3.bio <- envfit(LDC2.wds.model, LDC2.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LDC2.scores[,1], LDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC2.fit2_3.bio <- envfit(LDC2.wds.model, LDC2.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LDC2.scores[,2], LDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LDC 2 - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+LDC2.fit1_2.clim <- envfit(LDC2.wds.model, LDC2.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LDC2.scores[,1], LDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC2.fit1_3.clim <- envfit(LDC2.wds.model, LDC2.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LDC2.scores[,1], LDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC2.fit2_3.clim <- envfit(LDC2.wds.model, LDC2.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LDC2.scores[,2], LDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit2_3.clim, p.max = 0.05)
+```
+
+```{r LDC 2 - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+LDC2.fit1_2.wq <- envfit(LDC2.wds.model, LDC2.WQ, permutations = 999, choices = c(1,2))
+
+plot(LDC2.scores[,1], LDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC2.fit1_3.wq <- envfit(LDC2.wds.model, LDC2.WQ, permutations = 999, choices = c(1,3))
+
+plot(LDC2.scores[,1], LDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC2.fit2_3.wq <- envfit(LDC2.wds.model, LDC2.WQ, permutations = 999, choices = c(2,3))
+
+plot(LDC2.scores[,2], LDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LDC 2 - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+LDC2.fit1_2.bio <- envfit(LDC2.wds.model, LDC2.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LDC2.scores[,1], LDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC2.fit1_3.bio <- envfit(LDC2.wds.model, LDC2.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LDC2.scores[,1], LDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC2.fit2_3.bio <- envfit(LDC2.wds.model, LDC2.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LDC2.scores[,2], LDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LDC 2 - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+LDC2.fit1_2.clim <- envfit(LDC2.wds.model, LDC2.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LDC2.scores[,1], LDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC2.fit1_3.clim <- envfit(LDC2.wds.model, LDC2.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LDC2.scores[,1], LDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC2.fit2_3.clim <- envfit(LDC2.wds.model, LDC2.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LDC2.scores[,2], LDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit2_3.clim, p.max = 0.05)
+```
+
+```{r LDC 2 - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+LDC2.fit1_2.wq <- envfit(LDC2.wds.model, LDC2.WQ, permutations = 999, choices = c(1,2))
+
+plot(LDC2.scores[,1], LDC2.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC2.fit1_3.wq <- envfit(LDC2.wds.model, LDC2.WQ, permutations = 999, choices = c(1,3))
+
+plot(LDC2.scores[,1], LDC2.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC2.fit2_3.wq <- envfit(LDC2.wds.model, LDC2.WQ, permutations = 999, choices = c(2,3))
+
+plot(LDC2.scores[,2], LDC2.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC2.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 2: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC2.wds.model, groups = LDC2.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC2.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LDC 3 - Rare Removed + WDS Ordination}
+LDC3.wds <- wisconsin(LDC3.BMI)
+
+# Run the ordination
+LDC3.wds.model <- metaMDS(LDC3.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(LDC3.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(LDC3.wds.model)
+
+# Calculate goodness of fit
+gof.LDC3 <- goodness(object = LDC3.wds.model)
+gof.LDC3
+
+plot(LDC3.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+LDC3Cat1.WDS.MRPP <- mrpp(LDC3.wds, LDC3.flow$Cat1, permutations = 999, distance = "bray")
+print(LDC3Cat1.WDS.MRPP)
+
+# MRPP, Cat 3
+LDC3Cat3.WDS.MRPP <- mrpp(LDC3.wds, LDC3.flow$Cat3, permutations = 999, distance = "bray")
+print(LDC3Cat3.WDS.MRPP)
+
+# MRPP, Cat 6
+LDC3Cat6.WDS.MRPP <- mrpp(LDC3.wds, LDC3.flow$Cat6, permutations = 999, distance = "bray")
+print(LDC3Cat6.WDS.MRPP)
+
+# MRPP, Cat 12
+LDC3Cat12.WDS.MRPP <- mrpp(LDC3.wds, LDC3.flow$Cat12, permutations = 999, distance = "bray")
+print(LDC3Cat12.WDS.MRPP)
+```
+
+``` {r LCD 2 - Significant envrionmental variables}
+# Dimensions 1 & 2 (default)
+# Fit environmental vectors
+# LDC2.fit_12.wds <- envfit(LDC2.wds.model, LDC2.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.LDC2.wds <- as.data.frame(LDC2.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.LDC2.wds     <- LDC2.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.LDC2.wds  <- LDC2.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC2.sigvec_12.wds <- arrows_12.LDC2.wds %>%
+#   mutate(R2 = r2_12.LDC2.wds, pval = pvals_12.LDC2.wds, Variable = rownames(arrows_12.LDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC2.sigvec_12.wds <- LDC2.sigvec_12.wds %>% filter(pval < 0.05)
+#
+#
+# Dimensions 1 & 3
+# Fit environmental vectors
+# LDC2.fit_13.wds <- envfit(LDC2.wds.model, LDC2.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.LDC2.wds <- as.data.frame(LDC2.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.LDC2.wds     <- LDC2.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.LDC2.wds  <- LDC2.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC2.sigvec_13.wds <- arrows_13.LDC2.wds %>%
+#   mutate(R2 = r2_13.LDC2.wds, pval = pvals_13.LDC2.wds, Variable = rownames(arrows_13.LDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC2.sigvec_13.wds <- LDC2.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+#
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# LDC2.fit_23.wds <- envfit(LDC2.wds.model, LDC2.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.LDC2.wds <- as.data.frame(LDC2.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.LDC2.wds     <- LDC2.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.LDC2.wds  <- LDC2.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LDC2.sigvec_23.wds <- arrows_23.LDC2.wds %>%
+#   mutate(R2 = r2_23.LDC2.wds, pval = pvals_23.LDC2.wds, Variable = rownames(arrows_23.LDC2.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LDC2.sigvec_23.wds <- LDC2.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r LDC 3 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+LDC3.scores <- scores(LDC3.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r LDC 3 - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+LDC3.fit1_2.bio <- envfit(LDC3.wds.model, LDC3.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LDC3.scores[,1], LDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC3.fit1_3.bio <- envfit(LDC3.wds.model, LDC3.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LDC3.scores[,1], LDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC3.fit2_3.bio <- envfit(LDC3.wds.model, LDC3.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LDC3.scores[,2], LDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LDC 3 - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+LDC3.fit1_2.clim <- envfit(LDC3.wds.model, LDC3.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LDC3.scores[,1], LDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC3.fit1_3.clim <- envfit(LDC3.wds.model, LDC3.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LDC3.scores[,1], LDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC3.fit2_3.clim <- envfit(LDC3.wds.model, LDC3.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LDC3.scores[,2], LDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit2_3.clim, p.max = 0.05)
+```
+
+```{r LDC 3 - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+LDC3.fit1_2.wq <- envfit(LDC3.wds.model, LDC3.WQ, permutations = 999, choices = c(1,2))
+
+plot(LDC3.scores[,1], LDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC3.fit1_3.wq <- envfit(LDC3.wds.model, LDC3.WQ, permutŵtions = 999, choices = c(1,3))
+
+plot(LDC3.scores[,1], LDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC3.fit2_3.wq <- envfit(LDC3.wds.model, LDC3.WQ, permutations = 999, choices = c(2,3))
+
+plot(LDC3.scores[,2], LDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LDC 3 - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+LDC3.fit1_2.bio <- envfit(LDC3.wds.model, LDC3.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LDC3.scores[,1], LDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC3.fit1_3.bio <- envfit(LDC3.wds.model, LDC3.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LDC3.scores[,1], LDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC3.fit2_3.bio <- envfit(LDC3.wds.model, LDC3.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LDC3.scores[,2], LDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LDC 3 - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+LDC3.fit1_2.clim <- envfit(LDC3.wds.model, LDC3.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LDC3.scores[,1], LDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC3.fit1_3.clim <- envfit(LDC3.wds.model, LDC3.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LDC3.scores[,1], LDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC3.fit2_3.clim <- envfit(LDC3.wds.model, LDC3.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LDC3.scores[,2], LDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit2_3.clim, p.max = 0.05)
+```
+
+```{r LDC 3 - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+LDC3.fit1_2.wq <- envfit(LDC3.wds.model, LDC3.WQ, permutations = 999, choices = c(1,2))
+
+plot(LDC3.scores[,1], LDC3.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LDC3.fit1_3.wq <- envfit(LDC3.wds.model, LDC3.WQ, permutŵtions = 999, choices = c(1,3))
+
+plot(LDC3.scores[,1], LDC3.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LDC3.fit2_3.wq <- envfit(LDC3.wds.model, LDC3.WQ, permutations = 999, choices = c(2,3))
+
+plot(LDC3.scores[,2], LDC3.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LDC3.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LDC 3: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LDC3.wds.model, groups = LDC3.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LDC3.fit2_3.wq, p.max = 0.05)
+```
+```{r LtDC - Rare Removed + WDS Ordination}
+LtDC.wds <- wisconsin(LtDC.BMI)
+
+# Run the ordination
+LtDC.wds.model <- metaMDS(LtDC.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(LtDC.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(LtDC.wds.model)
+
+# Calculate goodness of fit
+gof.LtDC <- goodness(object = LtDC.wds.model)
+gof.LtDC
+
+plot(LtDC.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+LtDCCat1.WDS.MRPP <- mrpp(LtDC.wds, LtDC.flow$Cat1, permutations = 999, distance = "bray")
+print(LtDCCat1.WDS.MRPP)
+
+# MRPP, Cat 3
+LtDCCat3.WDS.MRPP <- mrpp(LtDC.wds, LtDC.flow$Cat3, permutations = 999, distance = "bray")
+print(LtDCCat3.WDS.MRPP)
+
+# MRPP, Cat 6
+LtDCCat6.WDS.MRPP <- mrpp(LtDC.wds, LtDC.flow$Cat6, permutations = 999, distance = "bray")
+print(LtDCCat6.WDS.MRPP)
+
+# MRPP, Cat 12
+LtDCCat12.WDS.MRPP <- mrpp(LtDC.wds, LtDC.flow$Cat12, permutations = 999, distance = "bray")
+print(LtDCCat12.WDS.MRPP)
+```
+
+``` {r LtDC - Significant envrionmental variables}
+# # Dimensions 1 & 2 (default)
+# # Fit environmental vectors
+# LtDC.fit_12.wds <- envfit(LtDC.wds.model, LtDC.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.LtDC.wds <- as.data.frame(LtDC.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.LtDC.wds     <- LtDC.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.LtDC.wds  <- LtDC.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LtDC.sigvec_12.wds <- arrows_12.LtDC.wds %>%
+#   mutate(R2 = r2_12.LtDC.wds, pval = pvals_12.LtDC.wds, Variable = rownames(arrows_12.LtDC.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LtDC.sigvec_12.wds <- LtDC.sigvec_12.wds %>% filter(pval < 0.05)
+# 
+# 
+# Dimensions 1 & 3
+# Fit environmental vectors
+# LtDC.fit_13.wds <- envfit(LtDC.wds.model, LtDC.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.LtDC.wds <- as.data.frame(LtDC.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.LtDC.wds     <- LtDC.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.LtDC.wds  <- LtDC.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LtDC.sigvec_13.wds <- arrows_13.LtDC.wds %>%
+#   mutate(R2 = r2_13.LtDC.wds, pval = pvals_13.LtDC.wds, Variable = rownames(arrows_13.LtDC.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LtDC.sigvec_13.wds <- LtDC.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+# 
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# LtDC.fit_23.wds <- envfit(LtDC.wds.model, LtDC.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.LtDC.wds <- as.data.frame(LtDC.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.LtDC.wds     <- LtDC.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.LtDC.wds  <- LtDC.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# LtDC.sigvec_23.wds <- arrows_23.LtDC.wds %>%
+#   mutate(R2 = r2_23.LtDC.wds, pval = pvals_23.LtDC.wds, Variable = rownames(arrows_23.LtDC.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# LtDC.sigvec_23.wds <- LtDC.sigvec_23.wds %>% filter(pval < 0.05)
+```
+
+```{r LDC 1 - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+LtDC.scores <- scores(LtDC.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r LtDC - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+LtDC.fit1_2.bio <- envfit(LtDC.wds.model, LtDC.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LtDC.scores[,1], LtDC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LtDC.fit1_3.bio <- envfit(LtDC.wds.model, LtDC.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LtDC.scores[,1], LtDC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LtDC.fit2_3.bio <- envfit(LtDC.wds.model, LtDC.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LtDC.scores[,2], LtDC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LtDC - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+LtDC.fit1_2.clim <- envfit(LtDC.wds.model, LtDC.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LtDC.scores[,1], LtDC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LtDC.fit1_3.clim <- envfit(LtDC.wds.model, LtDC.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LtDC.scores[,1], LtDC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LtDC.fit2_3.clim <- envfit(LtDC.wds.model, LtDC.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LtDC.scores[,2], LtDC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit2_3.clim, p.max = 0.05)
+```
+
+```{r LtDC - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+LtDC.fit1_2.wq <- envfit(LtDC.wds.model, LtDC.WQ, permutations = 999, choices = c(1,2))
+
+plot(LtDC.scores[,1], LtDC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LtDC.fit1_3.wq <- envfit(LtDC.wds.model, LtDC.WQ, permutations = 999, choices = c(1,3))
+
+plot(LtDC.scores[,1], LtDC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 1v3 dimensions \n Sig WQw vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LtDC.fit2_3.wq <- envfit(LtDC.wds.model, LtDC.WQ, permutations = 999, choices = c(2,3))
+
+plot(LtDC.scores[,2], LtDC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="LtDC: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit2_3.wq, p.max = 0.05)
+```
+
+```{r LtDC - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+LtDC.fit1_2.bio <- envfit(LtDC.wds.model, LtDC.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(LtDC.scores[,1], LtDC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LtDC.fit1_3.bio <- envfit(LtDC.wds.model, LtDC.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(LtDC.scores[,1], LtDC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LtDC.fit2_3.bio <- envfit(LtDC.wds.model, LtDC.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(LtDC.scores[,2], LtDC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit2_3.bio, p.max = 0.05)
+```
+
+```{r LtDC - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+LtDC.fit1_2.clim <- envfit(LtDC.wds.model, LtDC.CLIM, permutations = 999, choices = c(1,2))
+
+plot(LtDC.scores[,1], LtDC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LtDC.fit1_3.clim <- envfit(LtDC.wds.model, LtDC.CLIM, permutations = 999, choices = c(1,3))
+
+plot(LtDC.scores[,1], LtDC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 1v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LtDC.fit2_3.clim <- envfit(LtDC.wds.model, LtDC.CLIM, permutations = 999, choices = c(2,3))
+
+plot(LtDC.scores[,2], LtDC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit2_3.clim, p.max = 0.05)
+```
+```{r LtDC - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+LtDC.fit1_2.wq <- envfit(LtDC.wds.model, LtDC.WQ, permutations = 999, choices = c(1,2))
+
+plot(LtDC.scores[,1], LtDC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+LtDC.fit1_3.wq <- envfit(LtDC.wds.model, LtDC.WQ, permutations = 999, choices = c(1,3))
+
+plot(LtDC.scores[,1], LtDC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 1v3 dimensions \n Sig WQw vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+LtDC.fit2_3.wq <- envfit(LtDC.wds.model, LtDC.WQ, permutations = 999, choices = c(2,3))
+
+plot(LtDC.scores[,2], LtDC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[LtDC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="LtDC: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(LtDC.wds.model, groups = LtDC.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(LtDC.fit2_3.wq, p.max = 0.05)
+```
+```{r SC - Rare Removed + WDS Ordination}
+SC.wds <- wisconsin(SC.BMI)
+
+# Run the ordination
+SC.wds.model <- metaMDS(SC.wds, distance = "bray", 
+                                  autotransform = FALSE,
+                                  k = 3,
+                                  maxit = 999,
+                                  trymax = 500,
+                                  wascores = TRUE)
+
+screeplot_NMDS(SC.wds, distance = "bray", k = 6, trymax = 500, autotransform = FALSE)
+# Lower stress value indicates better fit
+
+# Shepard plot
+stressplot(SC.wds.model)
+
+# Calculate goodness of fit
+gof.SC <- goodness(object = SC.wds.model)
+gof.SC
+
+plot(SC.wds.model)
+
+# MRPP for WDS dataset, Cat 1
+SCCat1.WDS.MRPP <- mrpp(SC.wds, SC.flow$Cat1, permutations = 999, distance = "bray")
+print(SCCat1.WDS.MRPP)
+
+# MRPP, Cat 3
+SCCat3.WDS.MRPP <- mrpp(SC.wds, SC.flow$Cat3, permutations = 999, distance = "bray")
+print(SCCat3.WDS.MRPP)
+
+# MRPP, Cat 6
+SCCat6.WDS.MRPP <- mrpp(SC.wds, SC.flow$Cat6, permutations = 999, distance = "bray")
+print(SCCat6.WDS.MRPP)
+
+# MRPP, Cat 12
+SCCat12.WDS.MRPP <- mrpp(SC.wds, SC.flow$Cat12, permutations = 999, distance = "bray")
+print(SCCat12.WDS.MRPP)
+```
+
+``` {r SC - Significant envrionmental variables}
+# # Dimensions 1 & 2 (default)
+# # Fit environmental vectors
+# SCC.fit_12.wds <- envfit(SC.wds.model, SC.ENV, permutations = 999, choices = c(1,2))
+# 
+# # Extract vector info
+# arrows_12.SC.wds <- as.data.frame(SC.fit_12.wds$vectors$arrows)         # NMDS axis scores
+# r2_12.SC.wds     <- SC.fit_12.wds$vectors$r                             # R-squared
+# pvals_12.SC.wds  <- SC.fit_12.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# SC.sigvec_12.wds <- arrows_12.SC.wds %>%
+#   mutate(R2 = r2_12.SC.wds, pval = pvals_12.SC.wds, Variable = rownames(arrows_12.SC.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# SC.sigvec_12.wds <- SC.sigvec_12.wds %>% filter(pval < 0.05)
+# 
+# 
+# # Dimensions 1 & 3
+# # Fit environmental vectors
+# SC.fit_13.wds <- envfit(SC.wds.model, SC.ENV, permutations = 999, choices = c(1,3))
+# 
+# # Extract vector info
+# arrows_13.SC.wds <- as.data.frame(SC.fit_13.wds$vectors$arrows)         # NMDS axis scores
+# r2_13.SC.wds     <- SC.fit_13.wds$vectors$r                             # R-squared
+# pvals_13.SC.wds  <- SC.fit_13.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# SC.sigvec_13.wds <- arrows_13.SC.wds %>%
+#   mutate(R2 = r2_13.SC.wds, pval = pvals_13.SC.wds, Variable = rownames(arrows_13.SC.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# SC.sigvec_13.wds <- SCC.sigvec_13.wds %>% filter(pval < 0.05)
+# 
+# 
+# 
+# # Dimensions 2 & 3
+# # Fit environmental vectors
+# SC.fit_23.wds <- envfit(SC.wds.model, SC.ENV, permutations = 999, choices = c(2,3))
+# 
+# # Extract vector info
+# arrows_23.SC.wds <- as.data.frame(SC.fit_23.wds$vectors$arrows)         # NMDS axis scores
+# r2_23.SC.wds     <- SC.fit_23.wds$vectors$r                             # R-squared
+# pvals_23.SC.wds  <- SC.fit_23.wds$vectors$pvals                         # p-values
+# 
+# # Combine into one data frame
+# SC.sigvec_23.wds <- arrows_23.SC.wds %>%
+#   mutate(R2 = r2_23.SC.wds, pval = pvals_23.SC.wds, Variable = rownames(arrows_23.SC.wds)) %>%
+#   select(Variable, everything())
+# 
+# # Filter for significant vectors (e.g., p < 0.1)
+# SC.sigvec_23.wds <- SC.sigvec_23.wds %>% filter(pval < 0.05)
+```
+ 
+
+```{r SC - Model axis scores}
+## Extract scores (gives you the coordinates for all three axes)
+SC.scores <- scores(LtDC.wds.model, display = "sites")
+# head(UDC1.scores)
+```
+
+```{r SC - Cat 1 Bio Vars}
+## DIMENSIONS 1 and 2
+SC.fit1_2.bio <- envfit(SC.wds.model, SC.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(SC.scores[,1], SC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(SC.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+SC.fit1_3.bio <- envfit(SC.wds.model, SC.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(SC.scores[,1], SC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+SC.fit2_3.bio <- envfit(SC.wds.model, SC.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(SC.scores[,2], SC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit2_3.bio, p.max = 0.05)
+```
+```{r SC - Cat 1 Climate Vars}
+## DIMENSIONS 1 and 2
+SC.fit1_2.clim <- envfit(SC.wds.model, SC.CLIM, permutations = 999, choices = c(1,2))
+
+plot(SC.scores[,1], SC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(SC.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+SC.fit1_3.clim <- envfit(SC.wds.model, SC.CLIM, permutations = 999, choices = c(1,3))
+
+plot(SC.scores[,1], SC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+SC.fit2_3.clim <- envfit(SC.wds.model, SC.CLIM, permutations = 999, choices = c(2,3))
+
+plot(SC.scores[,2], SC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit2_3.clim, p.max = 0.05)
+```
+
+```{r SC - Cat 1 WQ Vars}
+## DIMENSIONS 1 and 2
+SC.fit1_2.wq <- envfit(SC.wds.model, SC.WQ, permutations = 999, choices = c(1,2))
+
+plot(SC.scores[,1], SC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(SC.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+SC.fit1_3.wq <- envfit(SC.wds.model, SC.WQ, permutations = 999, choices = c(1,3))
+
+plot(SC.scores[,1], SC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+SC.fit2_3.wq <- envfit(SC.wds.model, SC.WQ, permutations = 999, choices = c(2,3))
+
+plot(SC.scores[,2], SC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat1],  
+     col = "black", cex = 1.5,
+     main="SC: 1-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat1,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit2_3.wq, p.max = 0.05)
+```
+
+```{r SC - Cat 3 Bio Vars}
+## DIMENSIONS 1 and 2
+SC.fit1_2.bio <- envfit(SC.wds.model, SC.BIOVEC, permutations = 999, choices = c(1,2))
+
+plot(SC.scores[,1], SC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 1v2 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(SC.fit1_2.bio, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+SC.fit1_3.bio <- envfit(SC.wds.model, SC.BIOVEC, permutations = 999, choices = c(1,3))
+
+plot(SC.scores[,1], SC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit1_3.bio, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+SC.fit2_3.bio <- envfit(SC.wds.model, SC.BIOVEC, permutations = 999, choices = c(2,3))
+
+plot(SC.scores[,2], SC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 2v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit2_3.bio, p.max = 0.05)
+```
+```{r SC - Cat 3 Climate Vars}
+## DIMENSIONS 1 and 2
+SC.fit1_2.clim <- envfit(SC.wds.model, SC.CLIM, permutations = 999, choices = c(1,2))
+
+plot(SC.scores[,1], SC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 1v2 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(SC.fit1_2.clim, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+SC.fit1_3.clim <- envfit(SC.wds.model, SC.CLIM, permutations = 999, choices = c(1,3))
+
+plot(SC.scores[,1], SC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 1v3 dimensions \n Sig bio vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit1_3.clim, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+SC.fit2_3.clim <- envfit(SC.wds.model, SC.CLIM, permutations = 999, choices = c(2,3))
+
+plot(SC.scores[,2], SC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 2v3 dimensions \n Sig Climate vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit2_3.clim, p.max = 0.05)
+```
+
+```{r SC - Cat 3 WQ Vars}
+## DIMENSIONS 1 and 2
+SC.fit1_2.wq <- envfit(SC.wds.model, SC.WQ, permutations = 999, choices = c(1,2))
+
+plot(SC.scores[,1], SC.scores[,2],
+     xlab = "NMDS1", ylab = "NMDS2",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 1v2 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(1,2),
+            col = color.by.cat,
+            draw="polygon", label = T, cex = 0.5);
+plot(SC.fit1_2.wq, p.max = 0.05)
+
+## DIMENSIONS 1 and 3
+SC.fit1_3.wq <- envfit(SC.wds.model, SC.WQ, permutations = 999, choices = c(1,3))
+
+plot(SC.scores[,1], SC.scores[,3],
+     xlab = "NMDS1", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 1v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(1,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit1_3.wq, p.max = 0.05)
+
+## DIMENSIONS 2 and 3
+SC.fit2_3.wq <- envfit(SC.wds.model, SC.WQ, permutations = 999, choices = c(2,3))
+
+plot(SC.scores[,2], SC.scores[,3],
+     xlab = "NMDS2", ylab = "NMDS3",
+     pch = 21, bg = color.by.cat[SC.flow$Cat3],  
+     col = "black", cex = 1.5,
+     main="SC: 3-month Flow\n 2v3 dimensions \n Sig WQ vectors(p<0.1)");
+legend("topright", legend = names(color.by.cat),              
+       fill = color.by.cat, title = "Flow", bty = "n");
+ordiellipse(SC.wds.model, groups = SC.flow$Cat3,
+            choices = c(2,3),
+            col = color.by.cat,
+            draw = "polygon", label = T, cex = 0.5);
+plot(SC.fit2_3.wq, p.max = 0.05)
+```
