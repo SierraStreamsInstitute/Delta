@@ -1,5 +1,6 @@
 # Example Data and Code for Delta Research Project
-#### Author: Jeff Lauder (jeff@sierrastreamsinstitute.org)
+#### Author: Jeff Lauder 
+#### Contact: jeff@sierrastreamsinstitute.org
 #### Updated: 13 May 2026 by Jessica Herrmann
 
 ## I. Background
