@@ -1,7 +1,7 @@
 # Read Me
 #### Delta Project – Annual MRLC NLCD Data
 #### Author: Jessica Herrmann
-#### Updated: 6 May 2026
+#### Updated: 13 May 2026
 
 
 ## I. Huc8 Shapefiles
