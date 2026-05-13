@@ -1,5 +1,5 @@
 # Example Data and Code for Delta Research Project
-#### Author: Jeff Lauder 
+#### Authors: Jeff Lauder and Jessica Herrmann
 #### Contact: jeff@sierrastreamsinstitute.org
 #### Updated: 13 May 2026 by Jessica Herrmann
 
@@ -19,6 +19,9 @@ This is an example of benthic macroinvertebrate (BMI) count data that is set up 
 ## III. Example Scripts
 ### SEMs.R
 This is an example R script for constructing structural equation models.
+
+### DeerCreek_NMDS_AdditionalSiteClusters_JH04.29.2026.Rmd
+This is an example NMDS ordination script.
 
 ## Example Reference
 Oksanen, Jari, Gavin L. Simpson, F. Guillaume Blanchet, et al. 2025. Vegan: Community Ecology Package. V. 2.7-2. Released October 8. https://cran.r-project.org/web/packages/vegan/index.html. 
