@@ -13,7 +13,6 @@ ALLDeltaSitesLandsat8DayNDVI_1KM_5KM_2005_2025.csv –  this file contains NDVI 
 
 Delta_P_ET_WY2006_2024.csv – file containing calculated P-ET for hydrological years 2006 through 2024. Since NDVI was originally calculated as the mean within 1-km and 5-km buffers, there are two P-ET calculations, one for each respective spatial buffer.
 
-
 III. GEE JavaScript
 Delta Landsat NDVI Annotated JavaScript – a text document JavaScript set up to download NDVI data for the sites we will be referencing for biological/BMI data: all field sites surveyed by SSI for the Delta Project, as well as all supplemental sites (CEDEN and SYRCL). You can copy and paste this script into the Google Earth Engine code editor and update the highlighted values to download more data. To pull additional data, you will only need to change the date range and output file names in order to download the mean NDVI data for 2026 and beyond.
 
