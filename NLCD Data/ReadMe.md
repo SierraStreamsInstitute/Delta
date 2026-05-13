@@ -1,5 +1,5 @@
 # Read Me
-#### Delta Project – Annual MRLC NLCD Data
+#### Annual MRLC NLCD Data
 #### Author: Jessica Herrmann
 #### Updated: 13 May 2026
 
