@@ -4,7 +4,7 @@ Author: Jessica Herrmann
 Updated: 13 May 2026
 
 I. Background
-This folder contains daily 800-m gridded PRISM climate data for each year from 2000 through 2024. All climate parameters are in SI metric units. Since August through December of 2025 (and 2026) are either provisional or not yet available on PRISM’s website, I have only pulled the stable climate data relating to this project so far. I have also concatenated all of the individual yearly files into larger files, one for SSI’s field sites, and one for all supplemental (CEDEN and SYRCL) sites. This website was used to pull daily data from PRISM: https://prism.oregonstate.edu/explorer/bulk.php
+This folder contains daily 800-m gridded PRISM climate data for each year from 2005 through 2024. All climate parameters are in SI metric units. Since August through December of 2025 (and 2026) are either provisional or not yet available on PRISM’s website, I have only pulled the stable climate data relating to this project so far. I have also concatenated all of the individual yearly files into larger files, one for SSI’s field sites, and one for all supplemental (CEDEN and SYRCL) sites. This website was used to pull daily data from PRISM: https://prism.oregonstate.edu/explorer/bulk.php
 
 Here are the parameters I have pulled data for:
 Elevation (m)
