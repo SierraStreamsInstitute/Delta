@@ -26,8 +26,13 @@ Please use this locations file to pull remaining PRISM data for SSI field sites 
 Please use this locations file to pull remaining PRISM data for supplemental sites for 2005 – 2026.
 
 ## III. Datasets
-### DeltaFieldSites_PRISM_2005_2024 and DeltaSupplementalSites_PRISM_2005_2024
-Cleaned and concatenated datasets, combined for all years under respective site types (field vs. supplemental). These final datasets should be set up and ready to go for analysis.
+### DeltaFieldSites_PRISM_2005_2024
+Cleaned and concatenated PRISM climate dataset for SSI's Delta field sites, combined for all years
+
+###  DeltaSupplementalSites_PRISM_2005_2024
+Cleaned and concatenated PRISM climate dataset for the Delta supplemental sites, combined for all years
+
+These final datasets should be set up and ready to go for analysis, until the 2025 – 2026 PRISM data becomes available and stable.
 
 ## IV. Reference
 PRISM Group, Oregon State University, https://prism.oregonstate.edu, accessed 7 Apr. 2026.
