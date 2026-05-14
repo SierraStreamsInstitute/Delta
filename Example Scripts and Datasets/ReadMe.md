@@ -26,5 +26,5 @@ This is an example R script for constructing structural equation models.
 ### DeerCreek_NMDS_AdditionalSiteClusters_JH04.29.2026.Rmd
 This is an example NMDS ordination script that references the FINAL DATASET_BMI-Bio-Flow-Wq-Clim_updated5.2.26.csv example dataset.
 
-## Example Reference
+## IV. Example Reference
 Oksanen, Jari, Gavin L. Simpson, F. Guillaume Blanchet, et al. 2025. Vegan: Community Ecology Package. V. 2.7-2. Released October 8. https://cran.r-project.org/web/packages/vegan/index.html. 
