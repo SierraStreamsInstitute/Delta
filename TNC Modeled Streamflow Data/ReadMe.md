@@ -15,24 +15,24 @@ This website was used to pull modeled flow data: https://rivers.codefornature.or
 
 ## III. R Script
 ### TNC Flow Metadata Join.Rmd
-– This is a rough .Rmd doc outlining how I reformatted the original datasets from TNC to the final versions under the Datasets folder.
+This is a rough .Rmd doc outlining how I reformatted the original datasets from TNC to the final versions under the Datasets folder.
 
 ## IV. NHD COMIDs by Site
 ### SSI Field Site COMIDs
-– COMIDs for all of SSI’s Delta field sites
+COMIDs for all of SSI’s Delta field sites
 
 ### CEDEN & SYRCL Site COMIDs
-– COMIDs for CEDEN and SYRCL supplemental sites
+COMIDs for CEDEN and SYRCL supplemental sites
 
 ## V. Datasets
 ### Delta_SSIFieldSites_TNCFlowData_2005_2026
-– TNC modeled flow data for SSI’s field sites. Some of our sites were close to gaged reaches. I have downloaded this data and saved it as a separate file called Delta_SSIFieldSites_TNCNearbyGagesFlowData_1999_2025.csv. While likely not necessary for building models for the Delta Project, this second dataset may be useful for comparing some of our estimated flow data (as well as TNC modeled flow data) to observed flows at nearby gages.
+TNC modeled flow data for SSI’s field sites. Some of our sites were close to gaged reaches. I have downloaded this data and saved it as a separate file called Delta_SSIFieldSites_TNCNearbyGagesFlowData_1999_2025.csv. While likely not necessary for building models for the Delta Project, this second dataset may be useful for comparing some of our estimated flow data (as well as TNC modeled flow data) to observed flows at nearby gages.
 
 ### Delta_CEDEN_SYRCLSites_TNCFlowData_2005_2026
-– TNC modeled flow data for supplemental sites
+TNC modeled flow data for supplemental sites
 
 ### Delta_SSIFieldSites_TNCNearbyGagesFlowData_1999_2025
-– This is an earlier dataset I pulled that is optional for further analysis but could be useful for comparing our modeled flow data in the 2025 – 2026 SSI Estimated Flow Data folder to data from nearby gages, mainly the Butte Creek site (BUT). Included in this dataset are some of my notes on proximity of the gaged reach to the corresponding Delta reach, as well as information on the number of downstream tributaries.
+This is an earlier dataset I pulled that is optional for further analysis but could be useful for comparing our modeled flow data in the 2025 – 2026 SSI Estimated Flow Data folder to data from nearby gages, mainly the Butte Creek site (BUT). Included in this dataset are some of my notes on proximity of the gaged reach to the corresponding Delta reach, as well as information on the number of downstream tributaries.
 
 ## VI. Reference
 Julie K.H. Zimmerman, Daren M. Carlisle, Jason T. May, Kirk R. Klausmeyer, Theodore E. Grantham, Larry R. Brown, Jeanette K. Howard. California Unimpaired Flows Database v2.1.2, 2023. The Nature Conservancy. San Francisco CA. https://rivers.codefornature.org/ Date Accessed: 1 April 2026.
