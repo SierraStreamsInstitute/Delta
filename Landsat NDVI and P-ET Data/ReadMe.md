@@ -30,3 +30,5 @@ This Rmd script calculates P-ET for all field and supplemental sites, from water
 PRISM Group, Oregon State University, https://prism.oregonstate.edu, accessed 7 Apr. 2026.
 
 Earth Resources Observation and Science (EROS) Center. (2020). Landsat 8-9 Operational Land Imager / Thermal Infrared Sensor Level-2, Collection 2 [dataset]. U.S. Geological Survey.
+
+Rungee J, Ma Q, Goulden ML and Bales R (2021) Evapotranspiration and Runoff Patterns Across California's Sierra Nevada. Front. Water 3:655485. doi: 10.3389/frwa.2021.655485
