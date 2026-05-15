@@ -18,10 +18,10 @@ Benthic macroinvertebrate data from SSI's field sites (2025 – 2026), includin
 Water quality datasets both from SSI and partners and from public repositories (California Environmental Data Exchange Network [CEDEN]), including pH, turbidity, dissolved oxygen, conductivity, nutrient loading, bacteria.
 
 ### NLCD Data
-National Land Cover Database (NLCD) land cover and land cover change spatial data procured from the Multi-Resolution Land Use Consortium MRLC, to be clipped to 1-km and 5-km radius buffers around each site with biological data. 
+National Land Cover Database (NLCD) land cover and land cover change spatial data procured from the Multi-Resolution Land Use Consortium MRLC, clipped to 1-km and 5-km buffers around each site
 
 ### Landsat NDVI and P-ET
-30-m Landsat Normalized Vegetation Difference Index (NDVI) data, accessed through Google Earth Engine. A reducer function was applied to obtain mean NDVI for each site coordinate point within both a 1-km and 5-km radius buffer. This dataset was also used to calculate Precipitation-Evapotranspiration (P-ET), a climate metric that can in some instances be used as a proxy for surface water runoff.
+30-m Landsat Normalized Vegetation Difference Index (NDVI) data, accessed through Google Earth Engine. A reducer function was applied to obtain mean NDVI for each site coordinate point within both a 1-km and 5-km buffer region. This dataset was also used to calculate Precipitation-Evapotranspiration (P-ET), a climate metric that can in some instances be used as a proxy for surface water runoff.
 
 ### TNC Modeled Streamflow Data
 Monthly modeled flow data from The Nature Conservancy’s (TNC) Natural Flows Database
