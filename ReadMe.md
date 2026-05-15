@@ -32,7 +32,7 @@ Parameter-elevation Regressions on Independent Slopes Model (PRISM) daily 800-m 
 ### Estimated Streamflow
 SSI’s modeled stream discharge datasets. This folder also included the MS Excel sheet and R script used for deriving estimated streamflow from measurements of channel morphology and water level data.
 
-## III.Example Scripts and Datasets
+## III. Example Scripts and Datasets
 Please refer to this folder for example NMDS and SEM scripts, as well as the example biological and environmental datasets required to run them.
 
 
